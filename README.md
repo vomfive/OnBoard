@@ -23,7 +23,7 @@ Application web Flask pour la gestion des visiteurs en entreprise : enregistre
 
 1. **Clone le dépôt :**
    ```bash
-   git clone https://github.com/tonuser/projet01.git
+   git clone https://github.com/vagvom/beta-OnBoard
    cd projet01
    ```
 
@@ -91,7 +91,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ## Structure du projet
 
 ```
-projet01/
+beta-OnBoard/
 │
 ├── app.py
 ├── requirements.txt
@@ -115,8 +115,9 @@ projet01/
 
 ## Auteur
 
-Projet réalisé par [ton nom ou pseudo].
+Projet réalisé par vagvom.
 
 ---
 
-**Licence** : MIT (ou autre, à préciser)
+**Licence** : CC BY-NC 4.0  
+Vous pouvez utiliser, modifier et partager ce projet, mais **pas pour un usage commercial sans l’accord de l’auteur**.
