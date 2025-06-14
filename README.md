@@ -64,8 +64,8 @@ docker-compose up -d
 ## ⚡ Installation manuelle (développeur)
 
 ```bash
-git clone https://github.com/vomfive/onboard-app.git
-cd onboard-app
+git clone https://github.com/vomfive/beta-OnBoard
+cd beta-OnBoard
 pip install -r requirements.txt
 python app.py
 ```
