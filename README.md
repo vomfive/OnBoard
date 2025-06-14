@@ -1,100 +1,92 @@
-# OnBoard - Gestion des Visiteurs
+<div align="center">
+  <img src="./static/logos/default-logo.png" width="120" alt="OnBoard Logo" />
+</div>
 
-Application web Flask pour la gestion des visiteurs en entreprise : enregistrement, suivi, notifications, export CSV, personnalisation de l’interface, etc.
+# OnBoard
 
-## Fonctionnalités
+**OnBoard** est une application web de gestion des visiteurs pour entreprises, simple à installer et à personnaliser.
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/vomfive/onboard-app)](https://hub.docker.com/r/vomfive/onboard-app)
+[![Licence](https://img.shields.io/badge/Licence-CC%20BY--NC%204.0-blue)](https://creativecommons.org/licenses/by-nc/4.0/)
+
+---
+
+## 🚀 Démo rapide
+
+```bash
+docker run -d -p 5000:5000 --name onboard-app vomfive/onboard-app:latest
+```
+
+Accédez à [http://localhost:5000](http://localhost:5000)
+
+---
+
+## ✨ Fonctionnalités
 
 - Enregistrement et désinscription des visiteurs
 - Signature électronique et validation de consignes PDF
 - Gestion des personnes à visiter
 - Notifications par email (SMTP configurable)
-- Export des visiteurs au format CSV
+- Export CSV des visiteurs
 - Personnalisation des couleurs et du logo
 - Authentification administrateur
-- Protection des formulaires (CSRF possible avec Flask-WTF)
 - Interface responsive
 
-## Prérequis
+---
 
-- Python 3.8+
-- pip
+## 🐳 Déploiement avec Docker Compose
 
-## Installation
+Créez un fichier `docker-compose.yml` :
 
-1. **Clone le dépôt :**
-   ```bash
-   git clone https://github.com/vagvom/beta-OnBoard
-   cd projet01
-   ```
+```yaml
+version: '3.8'
 
-2. **Installe les dépendances :**
-   ```bash
-   pip install -r requirements.txt
-   ```
+services:
+  web:
+    image: vomfive/onboard-app:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads_pdf:/app/uploads_pdf
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+```
 
-3. **Lance l’application :**
-   ```bash
-   python app.py
-   ```
-   L’application sera accessible sur [http://localhost:5000](http://localhost:5000)
+Lancez :
 
-## Utilisation
-
-- Accède à `/login` pour te connecter en tant qu’administrateur (mot de passe par défaut : `admin`).
-- Configure le SMTP, les couleurs, le logo, etc. dans la page de configuration.
-- Les visiteurs peuvent s’enregistrer via la page d’accueil.
-
-## Utilisation en production avec Gunicorn
-
-Pour lancer l’application en production avec Gunicorn :
-
-1. **Installe Gunicorn** (si ce n’est pas déjà fait) :
-   ```bash
-   pip install gunicorn
-   ```
-
-2. **Lance l’application avec Gunicorn** :
-   ```bash
-   gunicorn -b 0.0.0.0:5000 app:app
-   ```
-   - Le premier `app` correspond au nom de ton fichier Python (`app.py` sans l’extension).
-   - Le second `app` correspond à la variable Flask (`app = Flask(__name__)`).
-
-3. **Avec Docker**  
-   Si tu utilises Docker, ajoute dans ton `Dockerfile` :
-   ```
-   CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]
-   ```
-
-**Astuce** : Pour de meilleures performances, tu peux ajouter l’option `-w 4` pour utiliser 4 workers (processus) :
 ```bash
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+docker-compose up -d
 ```
 
 ---
 
-**N’oublie pas** :  
-- En production, désactive le mode debug (`debug=False`).
-- Utilise un proxy (Nginx, Apache) devant Gunicorn pour la sécurité et le HTTPS (optionnel mais recommandé).
+## ⚡ Installation manuelle (développeur)
 
-## Déploiement avec Docker
+```bash
+git clone https://github.com/vomfive/onboard-app.git
+cd onboard-app
+pip install -r requirements.txt
+python app.py
+```
 
-1. **Construis l’image :**
-   ```bash
-   docker build -t onboard-app .
-   ```
-2. **Lance le conteneur :**
-   ```bash
-   docker run -p 5000:5000 onboard-app
-   ```
-   
-## Structure du projet
+---
+
+## 🔑 Connexion administrateur
+
+- Accédez à `/login`
+- Mot de passe par défaut : **admin**
+
+---
+
+## 📁 Structure du projet
 
 ```
-beta-OnBoard/
-│
+onboard-app/
 ├── app.py
 ├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
 ├── static/
 │   ├── style.css
 │   └── logos/
@@ -107,17 +99,12 @@ beta-OnBoard/
 └── uploads_pdf/
 ```
 
-## Conseils de sécurité
-
-- Change la clé secrète et le mot de passe admin par défaut avant la mise en production.
-- Utilise un serveur WSGI comme Gunicorn pour la production.
-- Mets à jour le fichier `.gitignore` pour ne pas versionner les fichiers sensibles.
-
-## Auteur
-
-Projet réalisé par vagvom.
-
 ---
 
-**Licence** : CC BY-NC 4.0  
-Vous pouvez utiliser, modifier et partager ce projet, mais **pas pour un usage commercial sans l’accord de l’auteur**.
+## 🛡️ Licence
+
+**CC BY-NC 4.0**  
+Vous pouvez utiliser, modifier et partager ce projet, mais **pas pour un usage commercial sans l’accord de l’auteur**.  
+[Voir la licence complète](https://creativecommons.org/licenses/by-nc/4.0/)
+
+---
