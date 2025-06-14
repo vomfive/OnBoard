@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if config and config.site_name %}
+            OnBoard - {{ config.site_name }}
+        {% else %}
+            OnBoard
+        {% endif %}
+    </title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    {% if config %}
+    <style>
+        :root {
+            --primary-color: {{ config.primary_color }};
+            --primary-dark: {{ config.primary_dark }};
+            --secondary-color: {{ config.secondary_color }};
+            --secondary-dark: {{ config.secondary_dark }};
+            --success-color: {{ config.success_color }};
+            --success-dark: {{ config.success_dark }};
+            --danger-color: {{ config.danger_color }};
+            --danger-dark: {{ config.danger_dark }};
+            --background-color: {{ config.background_color }};
+            --surface-color: {{ config.surface_color }};
+            --text-color: {{ config.text_color }};
+            --text-color-light: {{ config.text_color_light }};
+            --border-color: {{ config.border_color }};
+            --divider-color: {{ config.divider_color }};
+        }
+        .modal {
+            position: fixed;
+            z-index: 9999;
+            left: 0; top: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.3);
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: var(--surface-color, #fff);
+            padding: 2em 1.5em;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            text-align: center;
+            min-width: 300px;
+        }
+        .modal-actions {
+            margin-top: 1.5em;
+            display: flex;
+            gap: 1em;
+            justify-content: center;
+        }
+    </style>
+    {% endif %}
+</head>
+
+<body>
+    <div class="container">
+        <div style="text-align:center; margin-bottom: 1.5rem;">
+            <img src="{% if config and config.logo_filename %}{{ url_for('static', filename='logos/' + config.logo_filename) }}{% else %}{{ url_for('static', filename='logos/default-logo.png') }}{% endif %}" alt="Logo" class="logo-formulaire">
+        </div>
+        <h2>Enregistrement Visiteur</h2>
+        {% if config and config.site_name %}
+            <div class="site-name" style="font-size:1.2em; color:var(--primary-color); margin-bottom:0.3em; margin-top:-0.5em; text-align:center;">{{ config.site_name }}</div>
+        {% endif %}
+
+        <div id="confirmationMessage"></div>
+
+        <form id="visitorForm">
+            <div class="step active">
+                <div class="form-group">
+                    <label for="nom">Nom :</label>
+                    <input type="text" id="nom" name="nom" required autocomplete="off">
+                    <ul id="suggestions" class="suggestions-list" style="display: none;"></ul>
+                </div>
+            </div>
+            <div class="step">
+                <div class="form-group">
+                    <label for="prenom">Prénom :</label>
+                    <input type="text" id="prenom" name="prenom" required>
+                </div>
+            </div>
+            <div class="step">
+                <div class="form-group">
+                    <label for="entreprise">Entreprise :</label>
+                    <input type="text" id="entreprise" name="entreprise" required>
+                </div>
+            </div>
+            <div class="step">
+                <div class="form-group">
+                    <label for="person_to_visit">Personne à visiter :</label>
+                    <select id="person_to_visit" name="person_to_visit" required>
+                        <option value="">-- Sélectionner une personne --</option>
+                        {% for person in people_to_visit %}
+                        <option value="{{ person.id }}">{{ person.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            {% if pdf_filename %}
+            <div class="step">
+                <div class="pdf-section">
+                    <h3>Consignes Bâtiment</h3>
+                    <iframe id="pdfViewer" class="pdf-viewer"
+                        src="{{ url_for('uploaded_pdf_file', filename=pdf_filename) }}" type="application/pdf"></iframe>
+                    <div class="signature-section">
+                        <p>Veuillez lire attentivement les consignes ci-dessus et signer ci-dessous.</p>
+                        <button type="button" id="readButton" class="read-button" disabled>J'ai lu les consignes</button>
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label for="signatureCanvas">Signature :</label>
+                            <canvas id="signatureCanvas" class="signature-canvas" width="400" height="100"></canvas>
+                            <div class="signature-buttons">
+                                <button type="button" id="clearSignatureButton">Effacer</button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="signatureData" name="signature_data" value="">
+                        <input type="hidden" id="pdfViewed" name="pdf_viewed" value="false">
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <button type="submit" id="submitButton" class="submit-button" style="display: none;">Enregistrer</button>
+        </form>
+        <div class="step-navigation">
+            <button type="button" class="prev-button" style="display: none;">Précédent</button>
+            <button type="button" class="next-button">Suivant</button>
+        </div>
+    </div>
+    <script>
+        const nomInput = document.getElementById('nom');
+        const prenomInput = document.getElementById('prenom');
+        const entrepriseInput = document.getElementById('entreprise');
+        const suggestionsList = document.getElementById('suggestions');
+        const submitButton = document.getElementById('submitButton');
+
+        const pdfViewer = document.getElementById('pdfViewer');
+        const readButton = document.getElementById('readButton');
+        const signatureCanvas = document.getElementById('signatureCanvas');
+        const clearSignatureButton = document.getElementById('clearSignatureButton');
+        const signatureDataInput = document.getElementById('signatureData');
+        const pdfViewedInput = document.getElementById('pdfViewed');
+
+        let hasViewedPdf = false;
+        let hasSigned = false;
+
+        const steps = document.querySelectorAll('.step');
+        const prevButton = document.querySelector('.prev-button');
+        const nextButton = document.querySelector('.next-button');
+        const confirmationMessageDiv = document.getElementById('confirmationMessage');
+
+        let currentStepIndex = 0;
+
+        function activateReadButtonIfNeeded() {
+            if (readButton && readButton.disabled) {
+                setTimeout(() => {
+                    readButton.disabled = false;
+                    readButton.textContent = "J'ai lu les consignes";
+                }, 500);
+            }
+        }
+
+        function showStep(index) {
+            steps.forEach(step => step.classList.remove('active'));
+            steps[index].classList.add('active');
+            prevButton.style.display = (index === 0) ? 'none' : 'block';
+            nextButton.style.display = (index === steps.length - 1) ? 'none' : 'block';
+            submitButton.style.display = (index === steps.length - 1) ? 'block' : 'none';
+            if (index === steps.length - 1) {
+                updateSubmitButtonState();
+                activateReadButtonIfNeeded();
+            }
+        }
+
+        function nextStep() {
+            if (validateStep(currentStepIndex)) {
+                currentStepIndex++;
+                if (currentStepIndex < steps.length) {
+                    showStep(currentStepIndex);
+                }
+            }
+        }
+
+        function prevStep() {
+            currentStepIndex--;
+            if (currentStepIndex >= 0) {
+                showStep(currentStepIndex);
+            }
+        }
+
+        function validateStep(index) {
+            const currentStep = steps[index];
+            const inputs = currentStep.querySelectorAll('input[required], select[required]');
+            let isValid = true;
+            inputs.forEach(input => {
+                if (!input.checkValidity()) {
+                    isValid = false;
+                }
+            });
+            if (pdfViewer && currentStep.contains(pdfViewer)) {
+                if (!hasViewedPdf) {
+                    alert("Veuillez lire les consignes en entier avant de continuer.");
+                    isValid = false;
+                }
+                if (!hasSigned) {
+                    alert("Veuillez signer avant de continuer.");
+                    isValid = false;
+                }
+            }
+            return isValid;
+        }
+
+        showStep(currentStepIndex);
+        nextButton.addEventListener('click', nextStep);
+        prevButton.addEventListener('click', prevStep);
+
+        if (signatureCanvas) {
+            const ctx = signatureCanvas.getContext('2d');
+            let drawing = false;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000';
+
+            function getMousePos(canvas, evt) {
+                const rect = canvas.getBoundingClientRect();
+                return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+            }
+            function startDrawing(e) {
+                drawing = true;
+                const pos = getMousePos(signatureCanvas, e.touches ? e.touches[0] : e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                e.preventDefault();
+            }
+            function draw(e) {
+                if (!drawing) return;
+                const pos = getMousePos(signatureCanvas, e.touches ? e.touches[0] : e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                e.preventDefault();
+            }
+            function stopDrawing() {
+                if (!drawing) return;
+                drawing = false;
+                ctx.closePath();
+                hasSigned = !isCanvasBlank(signatureCanvas);
+                signatureDataInput.value = signatureCanvas.toDataURL();
+                updateSubmitButtonState();
+            }
+            function clearSignature() {
+                ctx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+                hasSigned = false;
+                signatureDataInput.value = '';
+                updateSubmitButtonState();
+            }
+            function isCanvasBlank(canvas) {
+                const blank = document.createElement('canvas');
+                blank.width = canvas.width; blank.height = canvas.height;
+                return canvas.toDataURL() === blank.toDataURL();
+            }
+
+            signatureCanvas.addEventListener('mousedown', startDrawing);
+            signatureCanvas.addEventListener('mousemove', draw);
+            signatureCanvas.addEventListener('mouseup', stopDrawing);
+            signatureCanvas.addEventListener('mouseout', stopDrawing);
+            signatureCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+            signatureCanvas.addEventListener('touchmove', draw, { passive: false });
+            signatureCanvas.addEventListener('touchend', stopDrawing);
+            signatureCanvas.addEventListener('touchcancel', stopDrawing);
+            clearSignatureButton.addEventListener('click', clearSignature);
+
+            if (signatureCanvas) {
+                 signatureCanvas.style.pointerEvents = 'none';
+                 clearSignatureButton.disabled = true;
+            }
+        }
+
+        function updateSubmitButtonState() {
+            const formIsValid = document.getElementById('visitorForm').checkValidity();
+            if (!pdfViewer) {
+                submitButton.disabled = !formIsValid;
+            } else {
+                submitButton.disabled = !(formIsValid && hasViewedPdf && hasSigned);
+            }
+        }
+
+        nomInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            if (query.length > 1) {
+                fetch(`/autocomplete-visitor?name=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => displaySuggestions(data))
+                    .catch(error => {
+                        console.error('Erreur lors de la recherche :', error);
+                        suggestionsList.style.display = 'none';
+                    });
+            } else {
+                suggestionsList.style.display = 'none';
+            }
+        });
+
+        function displaySuggestions(suggestions) {
+            suggestionsList.innerHTML = '';
+            if (suggestions.length > 0) {
+                suggestions.forEach(person => {
+                    const li = document.createElement('li');
+                    li.textContent = `${person.nom} ${person.prenom} (${person.entreprise})`;
+                    li.dataset.nom = person.nom;
+                    li.dataset.prenom = person.prenom;
+                    li.dataset.entreprise = person.entreprise;
+                    li.dataset.visitorId = person.id;
+                    li.dataset.enregistrementActif = person.enregistrement_actif;
+
+                    li.addEventListener('click', function() {
+                        if (this.dataset.enregistrementActif === 'true') {
+                            showCustomConfirm(
+                                `Bonjour ${this.dataset.prenom}, vous êtes déjà enregistré aujourd’hui.<br>Souhaitez-vous enregistrer votre départ ?`,
+                                () => {
+                                    fetch('/sign-out-visitor', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                        body: new URLSearchParams({ visitor_id: this.dataset.visitorId })
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        showCustomSuccess(
+                                            data.message || "Départ enregistré.",
+                                            () => window.location.reload()
+                                        );
+                                    })
+                                    .catch(err => alert("Erreur lors de l'enregistrement du départ : " + err.message));
+                                },
+                                () => { /* rien si non */ }
+                            );
+                            return;
+                        }
+                        nomInput.value = this.dataset.nom;
+                        prenomInput.value = this.dataset.prenom;
+                        entrepriseInput.value = this.dataset.entreprise;
+                        currentStepIndex = 3; 
+                        showStep(currentStepIndex);
+                        if (pdfViewer) {
+                            hasViewedPdf = false; pdfViewedInput.value = 'false';
+                            if(readButton) { readButton.disabled = true; readButton.textContent = "J'ai lu les consignes"; }
+                            if (signatureCanvas) { clearSignature(); signatureCanvas.style.pointerEvents = 'none'; if(clearSignatureButton) clearSignatureButton.disabled = true; }
+                        }
+                        updateSubmitButtonState();
+                        suggestionsList.style.display = 'none';
+                    });
+                    suggestionsList.appendChild(li);
+                });
+                suggestionsList.style.display = 'block';
+            } else {
+                suggestionsList.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('click', function(event) {
+            if (!nomInput.contains(event.target) && !suggestionsList.contains(event.target)) {
+                suggestionsList.style.display = 'none';
+            }
+        });
+
+        document.getElementById('visitorForm').addEventListener('input', function() {
+            if (currentStepIndex === steps.length - 1) {
+                updateSubmitButtonState();
+            }
+        });
+
+        if (pdfViewer) {
+            pdfViewer.addEventListener('load', function() {
+                if (readButton) {
+                    readButton.disabled = false;
+                    readButton.textContent = "J'ai lu les consignes";
+                }
+            });
+
+            if (readButton) {
+                readButton.addEventListener('click', function() {
+                    this.disabled = true;
+                    this.textContent = "Consignes lues";
+                    hasViewedPdf = true;
+                    pdfViewedInput.value = 'true';
+                    if (signatureCanvas) {
+                        signatureCanvas.style.pointerEvents = 'auto';
+                        if (clearSignatureButton) clearSignatureButton.disabled = false;
+                    }
+                    updateSubmitButtonState();
+                });
+            }
+
+            if (signatureCanvas) {
+                signatureCanvas.style.pointerEvents = 'none';
+                if (clearSignatureButton) clearSignatureButton.disabled = true;
+            }
+        }
+
+        setTimeout(() => {
+            if (readButton && readButton.disabled) {
+                readButton.disabled = false;
+                readButton.textContent = "J'ai lu les consignes";
+            }
+        }, 4000);
+
+        document.getElementById('visitorForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            if (!validateStep(currentStepIndex)) {
+                 return;
+            }
+            const formData = new FormData(this);
+            fetch('/enregistrer-visiteur', { method: 'POST', body: formData })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.message || `Erreur HTTP ! statut : ${response.status}`); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('visitorForm').style.display = 'none';
+                document.querySelector('.step-navigation').style.display = 'none';
+                let msg = data.message || 'Enregistrement réussi !';
+                if (msg.includes("Problème lors de l'envoi d'un ou des emails")) {
+                    msg = "Données reçues et enregistrées. Merci de patienter, quelqu’un va vous accueillir.";
+                }
+                showCustomSuccess(
+                    msg,
+                    () => window.location.reload()
+                );
+            })
+            .catch((error) => {
+                console.error('Erreur soumission formulaire :', error);
+                alert("Erreur lors de l'enregistrement : " + error.message);
+                document.getElementById('visitorForm').style.display = 'block';
+                document.querySelector('.step-navigation').style.display = 'block';
+                confirmationMessageDiv.style.display = 'none';
+            });
+        });
+
+        function showCustomConfirm(message, onYes, onNo) {
+            const modal = document.getElementById('customConfirmModal');
+            const msg = document.getElementById('customConfirmMessage');
+            const yesBtn = document.getElementById('customConfirmYes');
+            const noBtn = document.getElementById('customConfirmNo');
+            msg.innerHTML = message;
+            modal.style.display = 'flex';
+
+            function cleanup() {
+                modal.style.display = 'none';
+                yesBtn.removeEventListener('click', yesHandler);
+                noBtn.removeEventListener('click', noHandler);
+            }
+            function yesHandler() { cleanup(); onYes(); }
+            function noHandler() { cleanup(); if(onNo) onNo(); }
+
+            yesBtn.addEventListener('click', yesHandler);
+            noBtn.addEventListener('click', noHandler);
+        }
+
+        function showCustomSuccess(message, onOk) {
+            const modal = document.getElementById('customSuccessModal');
+            const msg = document.getElementById('customSuccessMessage');
+            const okBtn = document.getElementById('customSuccessOk');
+            msg.innerHTML = message;
+            modal.style.display = 'flex';
+
+            function cleanup() {
+                modal.style.display = 'none';
+                okBtn.removeEventListener('click', okHandler);
+            }
+            function okHandler() { cleanup(); if(onOk) onOk(); }
+
+            okBtn.addEventListener('click', okHandler);
+        }
+    </script>
+    <div id="customConfirmModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <p id="customConfirmMessage"></p>
+            <div class="modal-actions">
+                <button id="customConfirmYes" class="submit-button">Oui</button>
+                <button id="customConfirmNo" class="submit-button" style="background:var(--danger-color,#dc3545);">Non</button>
+            </div>
+        </div>
+    </div>
+    <div id="customSuccessModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <p id="customSuccessMessage"></p>
+            <div class="modal-actions">
+                <button id="customSuccessOk" class="submit-button">OK</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

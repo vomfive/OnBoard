@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if config and config.site_name %}
+            OnBoard - {{ config.site_name }}
+        {% else %}
+            OnBoard
+        {% endif %}
+    </title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    {% if config %}
+    <style>
+        :root {
+            --primary-color: {{ config.primary_color }};
+            --primary-dark: {{ config.primary_dark }};
+            --secondary-color: {{ config.secondary_color }};
+            --secondary-dark: {{ config.secondary_dark }};
+            --success-color: {{ config.success_color }};
+            --success-dark: {{ config.success_dark }};
+            --danger-color: {{ config.danger_color }};
+            --danger-dark: {{ config.danger_dark }};
+            --background-color: {{ config.background_color }};
+            --surface-color: {{ config.surface_color }};
+            --text-color: {{ config.text_color }};
+            --text-color-light: {{ config.text_color_light }};
+            --border-color: {{ config.border_color }};
+            --divider-color: {{ config.divider_color }};
+        }
+    </style>
+    {% endif %}
+    <style>
+        .container {
+            max-width: 1000px;
+            margin: 2em auto;
+            padding: 2em 1em;
+            background: var(--surface-color, #fff);
+            border-radius: var(--border-radius-medium, 8px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 2em;
+        }
+        table {
+            width: 100%;
+            min-width: 800px;
+            border-collapse: collapse;
+            background: var(--surface-color, #fff);
+            border-radius: var(--border-radius-medium, 8px);
+            overflow: hidden;
+        }
+        th, td {
+            padding: 0.8em 0.6em;
+            text-align: left;
+            border-bottom: 1px solid var(--divider-color, #e9ecef);
+        }
+        th {
+            background: var(--primary-color, #007bff);
+            color: #fff;
+            font-weight: 600;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.3em 0.9em;
+            border-radius: 1em;
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #fff;
+        }
+        .badge-present {
+            background: var(--success-color, #28a745);
+        }
+        .badge-sorti {
+            background: var(--danger-color, #dc3545);
+        }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2em;
+            flex-wrap: wrap;
+        }
+        .dashboard-title {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--text-color, #343a40);
+        }
+        .present-counter {
+            background: var(--success-color, #28a745);
+            color: #fff;
+            border-radius: 2em;
+            padding: 0.5em 1.2em;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-left: 1em;
+        }
+        .filter-form {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5em;
+            flex-wrap: wrap;
+            gap: 1em;
+        }
+        .filter-group form {
+            display: flex;
+            gap: 0.5em;
+            align-items: center;
+            margin: 0;
+        }
+        .export-button {
+            margin-left: auto;
+        }
+        .export-button, .filter-form button {
+            background: var(--primary-color, #007bff);
+            color: #fff;
+            border: none;
+            border-radius: var(--border-radius-small, 4px);
+            padding: 0.5em 1em;
+            font-weight: 600;
+            text-decoration: none;
+            margin-left: 1em;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        .export-button:hover, .filter-form button:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+        .no-visitors {
+            color: var(--text-color-light, #6c757d);
+            text-align: center;
+            margin: 2em 0;
+        }
+        .back-link {
+            margin-top: 2em;
+            text-align: center;
+        }
+        @media (max-width: 900px) {
+            .container {
+                max-width: 100vw;
+                padding: 1em 0.2em;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            table {
+                min-width: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard-header">
+            <span class="dashboard-title">Dashboard Visiteurs</span>
+            <span class="present-counter">
+                {% set presents = visitors|selectattr('heure_depart', '==', None)|list %}
+                {{ presents|length }} présent{{ 's' if presents|length > 1 else '' }}
+            </span>
+        </div>
+
+        <div class="filter-form">
+            <div class="filter-group">
+                <form method="GET" action="{{ url_for('visitors') }}" style="display: flex; flex-direction: column; margin: 0;">
+                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <label for="filter_date" style="margin-bottom: 0.2em; font-weight: 600; color: var(--primary-color, #007bff);">Filtrer par date :</label>
+                        <div style="display: flex; gap: 0.5em; align-items: center;">
+                            <input type="date" id="filter_date" name="filter_date" value="{{ selected_date if selected_date else '' }}">
+                            <button type="submit">Filtrer</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <a href="{{ url_for('export_visitors_csv', filter_date=selected_date if selected_date else '') }}" class="export-button">Exporter en CSV</a>
+        </div>
+
+        {% if visitors %}
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Prénom</th>
+                            <th>Entreprise</th>
+                            <th>Date</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for visitor in visitors %}
+                            <tr>
+                                <td>{{ visitor.nom }}</td>
+                                <td>{{ visitor.prenom }}</td>
+                                <td>{{ visitor.entreprise }}</td>
+                                <td>{{ visitor.date_enregistrement.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if not visitor.heure_depart %}
+                                        <span class="badge badge-present">Présent</span>
+                                    {% else %}
+                                        <span class="badge badge-sorti">Sorti</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="no-visitors">Aucun visiteur trouvé{% if selected_date %} pour la date {{ selected_date }}{% endif %}.</p>
+        {% endif %}
+
+        <div class="back-link">
+            <a href="{{ url_for('index') }}">Retour à l'accueil</a>
+        </div>
+    </div>
+</body>
+</html>

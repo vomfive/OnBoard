@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if config and config.site_name %}
+            OnBoard - {{ config.site_name }}
+        {% else %}
+            OnBoard
+        {% endif %}
+    </title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    {% if config %}
+    <style>
+        :root {
+            --primary-color: {{ config.primary_color }};
+            --primary-dark: {{ config.primary_dark }};
+            --secondary-color: {{ config.secondary_color }};
+            --secondary-dark: {{ config.secondary_dark }};
+            --success-color: {{ config.success_color }};
+            --success-dark: {{ config.success_dark }};
+            --danger-color: {{ config.danger_color }};
+            --danger-dark: {{ config.danger_dark }};
+            --background-color: {{ config.background_color }};
+            --surface-color: {{ config.surface_color }};
+            --text-color: {{ config.text_color }};
+            --text-color-light: {{ config.text_color_light }};
+            --border-color: {{ config.border_color }};
+            --divider-color: {{ config.divider_color }};
+        }
+    </style>
+    {% endif %}
+</head>
+<body>
+    <div class="container">
+        {% if config and config.logo_filename %}
+            <div style="text-align:center; margin-bottom: 1.5rem;">
+                <img src="{{ url_for('static', filename='logos/' + config.logo_filename) }}" alt="Logo" class="logo-formulaire">
+            </div>
+        {% else %}
+            <div style="text-align:center; margin-bottom: 1.5rem;">
+                <img src="{{ url_for('static', filename='logos/default-logo.png') }}" alt="Logo" class="logo-formulaire">
+            </div>
+        {% endif %}
+        <h2>Connexion</h2>
+        {% if config and config.site_name %}
+            <div class="site-name">{{ config.site_name }}</div>
+        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul style="margin-bottom:1em;">
+            {% for category, message in messages %}
+              <li style="color:var(--danger-color); font-weight:500;">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+        <form method="post">
+            <div class="form-group">
+                <label for="password">Mot de passe :</label>
+                <input type="password" name="password" id="password" required class="input">
+            </div>
+            <input type="hidden" name="next" value="{{ next or '' }}">
+            <button type="submit" class="next-button">Se connecter</button>
+        </form>
+    </div>
+</body>
+</html>
