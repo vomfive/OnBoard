@@ -1,42 +1,66 @@
+
+---
+
 <div align="center">
-  <img src="./static/logos/default-logo.png" width="120" alt="OnBoard Logo" />
+  <img src="./static/logos/default-logo.png" width="250" alt="OnBoard Logo" />
 </div>
 
 # OnBoard
 
-**OnBoard** est une application web de gestion des visiteurs pour entreprises, simple à installer et à personnaliser.
+**OnBoard** est une application web de **SVM – Système de Management des Visiteurs**, conçue pour gérer simplement et efficacement l’émargement, la traçabilité et l’accueil des visiteurs, prestataires et intervenants dans un établissement.
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/vomfive/onboard-app)](https://hub.docker.com/r/vomfive/onboard-app)
 [![Licence](https://img.shields.io/badge/Licence-CC%20BY--NC%204.0-blue)](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ---
 
-## 🚀 Démo rapide
+## 📌 Qu’est-ce qu’un SVM ?
+
+Un **SVM (Système de Management des Visiteurs)** est une solution numérique qui centralise les processus d'accueil, de contrôle d’accès, de notifications internes, et d’émargement de tous les visiteurs d’un site.
+**OnBoard** est un SVM simple à mettre en place, mais complet, adapté aux exigences de sécurité, de conformité et d’organisation des entreprises modernes.
+
+---
+
+## ✨ Fonctionnalités principales
+
+* 💬 **Accueil simplifié des visiteurs** avec formulaire d’enregistrement
+* 🔍 **Recherche intelligente** : saisie assistée du nom pour retrouver un profil existant
+* 📝 **Signature électronique** d’un règlement (PDF personnalisé)
+* 📧 **Notifications automatiques** à la personne visitée (et autres si besoin)
+* 🚪 **Désinscription des visiteurs** en fin de passage
+* 📊 **Tableau de bord des visites du jour** (présents/absents)
+* ⬇️ **Export CSV** pour archivage ou analyse
+* 🔐 **Portail administrateur sécurisé** avec :
+
+  * Gestion des personnes pouvant être visitées
+  * Configuration des consignes et notifications
+  * Personnalisation graphique (logo, couleurs)
+  * Paramétrage du serveur SMTP
+  * Changement du mot de passe admin
+
+---
+
+## 🛠️ Cas d’usage
+
+* Entreprises industrielles ou tertiaires
+* Établissements publics ou privés
+* Chantiers, usines, laboratoires
+* Locaux avec protocole de sécurité ou accès restreint
+* Accueil de prestataires techniques ou visiteurs ponctuels
+
+---
+
+## 🚀 Lancer l'application avec Docker
 
 ```bash
 docker run -d -p 5000:5000 --name onboard-app vomfive/onboard-app:latest
 ```
 
-Accédez à [http://localhost:5000](http://localhost:5000)
-
----
-
-## ✨ Fonctionnalités
-
-- Enregistrement et désinscription des visiteurs
-- Signature électronique et validation de consignes PDF
-- Gestion des personnes à visiter
-- Notifications par email (SMTP configurable)
-- Export CSV des visiteurs
-- Personnalisation des couleurs et du logo
-- Authentification administrateur
-- Interface responsive
+Accédez à l’interface via : [http://localhost:5000](http://localhost:5000)
 
 ---
 
 ## 🐳 Déploiement avec Docker Compose
-
-Créez un fichier `docker-compose.yml` :
 
 ```yaml
 version: '3.8'
@@ -47,14 +71,15 @@ services:
     ports:
       - "5000:5000"
     volumes:
+      - ./data:/app/data
       - ./uploads_pdf:/app/uploads_pdf
-      - ./static:/app/static
+      - ./static/logos:/app/static/logos
     environment:
       - FLASK_ENV=production
     restart: unless-stopped
 ```
 
-Lancez :
+Lancement :
 
 ```bash
 docker-compose up -d
@@ -62,32 +87,29 @@ docker-compose up -d
 
 ---
 
-## ⚡ Installation manuelle (développeur)
+## 🧑‍💻 Installation manuelle (développeur)
 
 ```bash
 git clone https://github.com/vomfive/beta-OnBoard
 cd beta-OnBoard
-pip install -r requirements.txt
+pip3 install Flask Flask_SQLAlchemy Werkzeug
 python app.py
 ```
 
 ---
 
-## 🔑 Connexion administrateur
+## 🔐 Accès administrateur
 
-- Accédez à `/login`
-- Mot de passe par défaut : **admin**
+* Accédez à : `/login`
+* Mot de passe par défaut : **admin**
 
 ---
 
-## 📁 Structure du projet
+## 📁 Arborescence du projet
 
 ```
 onboard-app/
 ├── app.py
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
 ├── static/
 │   ├── style.css
 │   └── logos/
@@ -97,15 +119,16 @@ onboard-app/
 │   ├── login.html
 │   ├── configuration.html
 │   └── visitors.html
-└── uploads_pdf/
+├── uploads_pdf/
+└── data/
 ```
 
 ---
 
 ## 🛡️ Licence
 
-**CC BY-NC 4.0**  
-Vous pouvez utiliser, modifier et partager ce projet, mais **pas pour un usage commercial sans l’accord de l’auteur**.  
-[Voir la licence complète](https://creativecommons.org/licenses/by-nc/4.0/)
+**CC BY-NC 4.0**
+Ce projet est librement utilisable à des fins non commerciales. Pour un usage professionnel ou commercial, merci de contacter l’auteur.
+[Consultez la licence complète](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ---
