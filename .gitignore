@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
 *.db
-instance/
 .env
 uploads_pdf/
 .vscode/ 

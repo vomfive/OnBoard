@@ -135,30 +135,38 @@ def allowed_file(filename, allowed_extensions_set):
 
 def send_email(recipient_email, subject, body, attach_pdf=False, html=False):
     config = Configuration.query.first()
+    print("[LOG] Début send_email")
     if not config:
-        print("Erreur : Configuration SMTP non trouvée.")
+        print("[LOG] Erreur : Configuration SMTP non trouvée.")
         return False
+    print(f"[LOG] SMTP config utilisée : serveur={config.smtp_server}, port={config.smtp_port}, user={config.smtp_user}, sender={config.sender_email}")
+    if not all([config.smtp_server, config.smtp_port, config.smtp_user, config.smtp_password, config.sender_email]):
+        print("[LOG] Erreur : Paramètres SMTP incomplets.")
+        return False
+    # Création du message
     if html:
-        msg = MIMEMultipart()
-        msg.attach(MIMEText(body, 'html'))
+        msg = MIMEText(body, 'html')
     else:
-        msg = MIMEMultipart() if attach_pdf else MIMEText(body)
-        if not attach_pdf:
-            msg = MIMEText(body)
-        else:
-            msg.attach(MIMEText(body))
+        msg = MIMEText(body, 'plain')
     msg['Subject'] = subject
     msg['From'] = config.sender_email
     msg['To'] = recipient_email
     try:
-        with smtplib.SMTP(config.smtp_server, config.smtp_port) as server:
+        print("[LOG] Connexion au serveur SMTP...")
+        with smtplib.SMTP(config.smtp_server, int(config.smtp_port)) as server:
+            print("[LOG] Démarrage TLS...")
             server.starttls()
+            print("[LOG] Login SMTP...")
             server.login(config.smtp_user, config.smtp_password)
+            print(f"[LOG] Envoi du mail à {recipient_email}...")
             server.sendmail(config.sender_email, recipient_email, msg.as_string())
-        print(f"Email envoyé à {recipient_email} avec succès.")
+        print(f"[LOG] Email envoyé à {recipient_email} avec succès.")
         return True
+    except smtplib.SMTPException as e:
+        print(f"[LOG] Erreur SMTP lors de l'envoi de l'email à {recipient_email} : {e}")
+        return False
     except Exception as e:
-        print(f"Erreur lors de l'envoi de l'email à {recipient_email} : {e}")
+        print(f"[LOG] Erreur lors de l'envoi de l'email à {recipient_email} : {e}")
         return False
 
 @app.route('/')
@@ -384,10 +392,9 @@ def enregistrer_visiteur():
         if config and config.pdf_filename:
             if not pdf_viewed or not signature_data:
                 return jsonify({"message": "Veuillez lire les consignes et signer."}, 400)
-        send_emails_flag = True
-        if not config or not config.smtp_server or not config.smtp_user:
-            print("Avertissement : Configuration SMTP incomplète. Emails non envoyés.")
-            send_emails_flag = False
+        send_emails_flag = bool(config and config.smtp_server and config.smtp_user and config.smtp_password and config.sender_email and config.smtp_port)
+        if not send_emails_flag:
+            print("[LOG] Avertissement : Configuration SMTP incomplète. Emails non envoyés.")
         person_to_visit = PersonToVisit.query.get(person_to_visit_id)
         if not person_to_visit:
             return jsonify({"message": "Personne à visiter invalide."}, 400)
@@ -403,7 +410,56 @@ def enregistrer_visiteur():
                 "N'oubliez pas de venir vous désinscrire avant votre départ !"
             )
             if send_emails_flag:
-                pass
+                # Préparation du logo (logo config ou logo par défaut sans accent)
+                logo_filename = config.logo_filename if config and config.logo_filename else 'default-logo.png'
+                logo_url = url_for('static', filename=f'logos/{logo_filename}', _external=True)
+                logo_html_top = f'<div style="text-align:center;margin-bottom:18px;"><img src="{logo_url}" alt="Logo" style="max-width:240px;max-height:100px;"></div>'
+                onboard_text_bottom = '<div style="text-align:right;color:#257C88;font-size:15px;font-weight:bold;margin-top:24px;">OnBoard</div>'
+                # Message pour la personne visitée (HTML design)
+                heure_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+                site_name = config.site_name if config and config.site_name else "le site"
+                sujet_visited = f"[OnBoard] {prenom} {nom} est arrivé"
+                body_visited = f'''
+                <div style="max-width:500px;margin:0 auto;padding:24px;background:#f7fafd;border-radius:8px;border:1px solid #e3e8ee;font-family:Arial,sans-serif;">
+                  {logo_html_top}
+                  <h2 style="color:#257C88;margin-top:0;">Arrivée d'un visiteur</h2>
+                  <p style="font-size:16px;">Pour information, <span style="font-weight:bold;color:#0C2E45;">{prenom} {nom}</span> de l'entreprise <span style="font-weight:bold;color:#0C2E45;">{entreprise}</span> est arrivé sur le site de <span style="color:#257C88;">{site_name}</span>.</p>
+                  <p style="font-size:15px;margin:18px 0 8px 0;">Heure d'enregistrement :</p>
+                  <div style="font-size:18px;font-weight:bold;color:#28a745;margin-bottom:18px;">{heure_str}</div>
+                  {onboard_text_bottom}
+                </div>
+                '''
+                print(f"[LOG] Appel send_email avec : dest={person_to_visit.email}, sujet={sujet_visited}, body={body_visited}")
+                if send_email(person_to_visit.email, sujet_visited, body_visited, html=True):
+                    print("[LOG] Email envoyé avec succès (retour True).")
+                else:
+                    print("[LOG] L'envoi de l'email a échoué (retour False).")
+                # Message pour les personnes toujours notifiées (HTML design)
+                sujet_notif = f"[OnBoard] Nouvel enregistrement sur le site de {site_name}"
+                body_notif = f'''
+                <div style="max-width:500px;margin:0 auto;padding:24px;background:#f7fafd;border-radius:8px;border:1px solid #e3e8ee;font-family:Arial,sans-serif;">
+                  {logo_html_top}
+                  <h2 style="color:#257C88;margin-top:0;">Nouvel enregistrement visiteur</h2>
+                  <p style="font-size:16px;">Une nouvelle personne vient de s'enregistrer pour voir <span style="font-weight:bold;color:#0C2E45;">{person_to_visit.name}</span>.</p>
+                  <div style="margin:18px 0 8px 0;">
+                    <div><b>Nom :</b> <span style="color:#0C2E45;">{nom}</span></div>
+                    <div><b>Prénom :</b> <span style="color:#0C2E45;">{prenom}</span></div>
+                    <div><b>Entreprise :</b> <span style="color:#0C2E45;">{entreprise}</span></div>
+                    <div><b>Heure et date d'enregistrement :</b> <span style="color:#28a745;">{heure_str}</span></div>
+                  </div>
+                  <div style="margin:18px 0 8px 0;">
+                    <a href="http://127.0.0.1:5000/visitors" style="color:#257C88;text-decoration:underline;font-weight:bold;">Voir la liste des visiteurs</a>
+                  </div>
+                  {onboard_text_bottom}
+                </div>
+                '''
+                notification_emails = NotificationEmail.query.all()
+                for notif in notification_emails:
+                    print(f"[LOG] Appel send_email pour notification : dest={notif.email}, sujet={sujet_notif}, body={body_notif}")
+                    if send_email(notif.email, sujet_notif, body_notif, html=True):
+                        print(f"[LOG] Email de notification envoyé à {notif.email} (retour True).")
+                    else:
+                        print(f"[LOG] L'envoi de l'email de notification à {notif.email} a échoué (retour False).")
             status_code = 200
         except Exception as e:
             db.session.rollback()
@@ -587,12 +643,12 @@ def delete_notification_email(notif_id):
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-        if not Configuration.query.first():
-            config = Configuration()
-            db.session.add(config)
-            db.session.commit()
-            print("Configuration par défaut créée (mot de passe admin = 'admin').")
-        print("Bases de données et tables créées/vérifiées.")
-    app.run(debug=True)
-
+        # Si la base n'existe pas ou est vide, on crée les tables
+        if not os.path.exists('users.db') or os.path.getsize('users.db') == 0:
+            db.create_all()
+            print(">>> Tables créées !")
+        # Pour la base de config
+        if not os.path.exists('config.db') or os.path.getsize('config.db') == 0:
+            db.create_all(bind='config_db')
+            print(">>> Tables config créées !")
+    app.run(debug=True, host='0.0.0.0')

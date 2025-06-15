@@ -560,11 +560,3 @@ th {
     display: block;
     margin: 0 auto 2rem auto;
 }
-
-.site-name {
-    font-size: 1.2em;
-    color: var(--primary-color);
-    margin-bottom: 0.3em;
-    margin-top: -0.5em;
-    text-align: center;
-}
