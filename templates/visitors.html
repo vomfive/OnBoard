@@ -45,11 +45,11 @@
         .container {
             max-width: 1100px;
             margin: 2em auto;
-            padding: 2em 1.5em 1em 1.5em; /* padding-bottom réduit */
+            padding: 2em 1.5em 1em 1.5em;
             background: #fff;
             border-radius: 18px;
             box-shadow: 0 6px 32px 0 rgba(0,0,0,0.07);
-            overflow: hidden; /* pour arrondis propres */
+            overflow: hidden;
         }
         .dashboard-header {
             display: flex;
@@ -222,7 +222,7 @@
         .table-responsive {
             width: 100%;
             overflow-x: auto;
-            margin-bottom: 2.5em; /* plus de marge sous le tableau */
+            margin-bottom: 2.5em;
             border-radius: 10px;
         }
         table {
@@ -336,7 +336,6 @@
             <span class="dashboard-title"><i class="fa-solid fa-users"></i> Dashboard Visiteurs</span>
         </div>
 
-        <!-- Tableau de bord statistiques -->
         <div class="stats-dashboard">
             <div class="stat-card">
                 <i class="fa-solid fa-users"></i>
@@ -482,7 +481,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const dataClean = visitesParHeure.map(v => (typeof v === 'number' && !isNaN(v)) ? v : 0);
 
     function getColor(v) {
-        // Pour 1 visiteur = bleu, 4 ou + = jaune
         const ratio = Math.max(0, Math.min(1, (v - 1) / 3));
         if (ratio < 0.5) {
             const r = Math.round(41 + (46-41)*ratio*2);

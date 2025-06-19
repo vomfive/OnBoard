@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, make_response, send_from_directory, session, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from datetime import datetime, date, timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -26,7 +27,7 @@ ADMIN_PASSWORD = "tonmotdepasse"
 
 RECAPTCHA_SITE_KEY = "VOTRE_SITE_KEY"
 RECAPTCHA_SECRET_KEY = "VOTRE_SECRET_KEY"
-RECAPTCHA_THRESHOLD = 3  # nombre d'échecs avant captcha
+RECAPTCHA_THRESHOLD = 3
 
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
@@ -43,7 +44,6 @@ def login():
     config = Configuration.query.first()
     next_url = request.args.get('next') or request.form.get('next') or url_for('configuration')
     message = request.args.get('message')
-    # Utilisation dynamique de la config captcha
     captcha_enabled = bool(getattr(config, 'captcha_enabled', False))
     captcha_threshold = getattr(config, 'captcha_threshold', 3)
     recaptcha_site_key = getattr(config, 'recaptcha_site_key', '')
@@ -53,13 +53,11 @@ def login():
     if request.method == 'POST':
         password = request.form.get('password')
         stay_logged = request.form.get('stay_logged') == 'on'
-        # Vérification du captcha si nécessaire
         if show_captcha:
             recaptcha_response = request.form.get('g-recaptcha-response')
             if not recaptcha_response:
                 flash("Veuillez valider le captcha.", "danger")
                 return render_template('login.html', config=config, next=next_url, message=message, show_captcha=show_captcha, recaptcha_site_key=recaptcha_site_key)
-            # Vérification côté Google
             r = requests.post(
                 'https://www.google.com/recaptcha/api/siteverify',
                 data={'secret': recaptcha_secret_key, 'response': recaptcha_response}
@@ -69,7 +67,7 @@ def login():
                 return render_template('login.html', config=config, next=next_url, message=message, show_captcha=show_captcha, recaptcha_site_key=recaptcha_site_key)
         if config and check_password_hash(config.admin_password_hash, password):
             session['admin_logged_in'] = True
-            session['login_failures'] = 0  # reset uniquement après succès
+            session['login_failures'] = 0
             if stay_logged:
                 app.permanent_session_lifetime = timedelta(days=7)
             else:
@@ -79,8 +77,6 @@ def login():
         else:
             session['login_failures'] = session.get('login_failures', 0) + 1
             flash("Mot de passe incorrect", "danger")
-    # Ne pas reset login_failures sur GET
-
     return render_template('login.html', config=config, next=next_url, message=message, show_captcha=show_captcha, recaptcha_site_key=recaptcha_site_key)
 
 @app.route('/logout')
@@ -100,11 +96,6 @@ UPLOAD_FOLDER_PDF = 'uploads_pdf'
 app.config['UPLOAD_FOLDER_PDF'] = UPLOAD_FOLDER_PDF
 if not os.path.exists(UPLOAD_FOLDER_PDF):
     os.makedirs(UPLOAD_FOLDER_PDF)
-
-FAVICON_FOLDER = os.path.join(app.static_folder, 'favicons')
-app.config['FAVICON_FOLDER'] = FAVICON_FOLDER
-if not os.path.exists(FAVICON_FOLDER):
-    os.makedirs(FAVICON_FOLDER)
 
 ALLOWED_EXTENSIONS_LOGO = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
 LOGO_FOLDER = os.path.join(app.static_folder, 'logos')
@@ -168,13 +159,12 @@ class Configuration(db.Model):
     text_color_light = db.Column(db.String(7), default='#257C88')
     border_color = db.Column(db.String(7), default='#ced4da')
     divider_color = db.Column(db.String(7), default='#e9ecef')
-    # Champs pour captcha
     captcha_enabled = db.Column(db.Boolean, default=False)
     captcha_threshold = db.Column(db.Integer, default=3)
     recaptcha_site_key = db.Column(db.String(120), nullable=True)
     recaptcha_secret_key = db.Column(db.String(120), nullable=True)
     def __repr__(self):
-        return f"Configuration(SMTP Server: '{self.smtp_server}', PDF: '{self.pdf_filename}', Favicon: '{self.favicon_filename}')"
+        return f"Configuration(SMTP Server: '{self.smtp_server}', PDF: '{self.pdf_filename}')"
 
 class NotificationEmail(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -196,7 +186,6 @@ def send_email(recipient_email, subject, body, attach_pdf=False, html=False):
     if not all([config.smtp_server, config.smtp_port, config.smtp_user, config.smtp_password, config.sender_email]):
         print("[LOG] Erreur : Paramètres SMTP incomplets.")
         return False
-    # Création du message
     if html:
         msg = MIMEText(body, 'html')
     else:
@@ -310,17 +299,6 @@ def save_configuration():
                 print(f"Fichier PDF '{filename}' sauvegardé.")
             else:
                 print("Erreur : Type de fichier PDF non autorisé.")
-    if 'favicon_file' in request.files:
-        file = request.files['favicon_file']
-        if file.filename != '':
-            if file and allowed_file(file.filename, ALLOWED_EXTENSIONS_FAVICON):
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(app.config['FAVICON_FOLDER'], filename)
-                file.save(filepath)
-                config.favicon_filename = filename 
-                print(f"Favicon '{filename}' sauvegardé.")
-            else:
-                print("Erreur : Type de fichier Favicon non autorisé.")
     if 'logo_file' in request.files:
         file = request.files['logo_file']
         if file.filename != '':
@@ -348,7 +326,6 @@ def save_smtp():
     smtp_user = request.form.get('smtp_user', '').strip()
     smtp_password = request.form.get('smtp_password', '').strip()
     sender_email = request.form.get('sender_email', '').strip()
-    # Validation email expéditeur
     if not sender_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", sender_email):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': 'Email expéditeur invalide.'}), 400
@@ -403,12 +380,6 @@ def save_appearance():
                 return redirect(url_for('configuration', tab='tab-appearance'))
             file.save(os.path.join(app.config['LOGO_FOLDER'], filename))
             config.logo_filename = filename
-    if 'favicon_file' in request.files:
-        file = request.files['favicon_file']
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['FAVICON_FOLDER'], filename))
-            config.favicon_filename = filename
     db.session.commit()
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'success': True})
@@ -424,11 +395,9 @@ def save_pdf():
         file = request.files['pdf_file']
         if file and file.filename:
             filename = secure_filename(file.filename)
-            # Vérification extension
             if not allowed_file(filename, ALLOWED_EXTENSIONS_PDF):
                 flash("Type de fichier PDF non autorisé.", "danger")
                 return redirect(url_for('configuration', tab='tab-form'))
-            # Limite de taille (ex: 5 Mo)
             file.seek(0, os.SEEK_END)
             size = file.tell()
             file.seek(0)
@@ -448,13 +417,11 @@ def uploaded_pdf_file(filename):
 def add_person_to_visit():
     name = request.form.get('person_name', '').strip()
     email = request.form.get('person_email', '').strip()
-    # Validation nom : longueur, caractères autorisés (lettres, espaces, tirets)
     if not name or len(name) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", name):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': 'Nom invalide (caractères non autorisés ou trop long)'}), 400
         flash("Nom invalide (caractères non autorisés ou trop long)", "danger")
         return redirect(url_for('configuration', tab='tab-form'))
-    # Validation email basique
     if not email or len(email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': 'Email invalide'}), 400
@@ -495,7 +462,6 @@ def enregistrer_visiteur():
         pdf_viewed = data.get('pdf_viewed') == 'true'
         autre_nom = data.get('autre_nom', '').strip()
         autre_prenom = data.get('autre_prenom', '').strip()
-        # Validation nom/prenom/entreprise
         if not nom or len(nom) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", nom):
             return jsonify({"message": "Nom invalide."}), 400
         if not prenom or len(prenom) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", prenom):
@@ -511,7 +477,6 @@ def enregistrer_visiteur():
         send_emails_flag = bool(config and config.smtp_server and config.smtp_user and config.smtp_password and config.sender_email and config.smtp_port)
         if not send_emails_flag:
             print("[LOG] Avertissement : Configuration SMTP incomplète. Emails non envoyés.")
-        # Gestion du cas 'autre'
         if person_to_visit_id == 'autre':
             if not autre_nom or not autre_prenom:
                 return jsonify({"message": "Veuillez renseigner le nom et prénom de la personne à visiter."}, 400)
@@ -521,7 +486,7 @@ def enregistrer_visiteur():
                 person_to_visit=None, signature_data=signature_data
             )
             nouveau_visiteur.email = personne_a_visiter
-            person_to_visit = None  # Pour la suite
+            person_to_visit = None
         else:
             person_to_visit = PersonToVisit.query.get(person_to_visit_id)
             if not person_to_visit:
@@ -538,12 +503,10 @@ def enregistrer_visiteur():
                 "N'oubliez pas de venir vous désinscrire avant votre départ !"
             )
             if send_emails_flag and person_to_visit:
-                # Préparation du logo (logo config ou logo par défaut sans accent)
                 logo_filename = config.logo_filename if config and config.logo_filename else 'default-logo.png'
                 logo_url = url_for('static', filename=f'logos/{logo_filename}', _external=True)
                 logo_html_top = f'<div style="text-align:center;margin-bottom:18px;"><img src="{logo_url}" alt="Logo" style="max-width:240px;max-height:100px;"></div>'
                 onboard_text_bottom = '<div style="text-align:right;color:#257C88;font-size:15px;font-weight:bold;margin-top:24px;">OnBoard</div>'
-                # Message pour la personne visitée (HTML design)
                 heure_str = datetime.now().strftime('%d/%m/%Y %H:%M')
                 site_name = config.site_name if config and config.site_name else "le site"
                 sujet_visited = f"[OnBoard] {prenom} {nom} est arrivé"
@@ -562,7 +525,6 @@ def enregistrer_visiteur():
                     print("[LOG] Email envoyé avec succès (retour True).")
                 else:
                     print("[LOG] L'envoi de l'email a échoué (retour False).")
-                # Message pour les personnes toujours notifiées (HTML design)
                 sujet_notif = f"[OnBoard] Nouvel enregistrement sur le site de {site_name}"
                 body_notif = f'''
                 <div style="max-width:500px;margin:0 auto;padding:24px;background:#f7fafd;border-radius:8px;border:1px solid #e3e8ee;font-family:Arial,sans-serif;">
@@ -604,7 +566,7 @@ def visitors():
     person_id = request.args.get('person_id', '').strip()
     statut = request.args.get('statut', '').strip()
     page = int(request.args.get('page', 1))
-    per_page = 20  # Nombre de visiteurs par page
+    per_page = 20
 
     if not filter_date_str:
         filter_date_obj = date.today()
@@ -644,10 +606,8 @@ def visitors():
         heure_pic, nb_pic = None, 0
 
     personnes = PersonToVisit.query.all()
-    # Après avoir filtré visitors_list
     heures = [v.date_enregistrement.strftime('%H') for v in visitors_list if v.date_enregistrement]
     compteur_heures = Counter(heures)
-    # Pour chaque heure de 0 à 23, on met 0 si aucune visite
     visites_par_heure = [compteur_heures.get(f"{h:02d}", 0) for h in range(24)]
 
     return render_template(
@@ -751,24 +711,19 @@ def autocomplete_visitor():
 
 @app.route('/sign-out-visitor', methods=['POST'])
 def sign_out_visitor():
+    if not session.get('admin_logged_in'):
+        return jsonify({'message': 'Session expirée ou non autorisée.'}), 401
     visitor_id = request.form.get('visitor_id')
+    if not visitor_id or not visitor_id.isdigit():
+        return jsonify({'message': 'ID visiteur invalide.'}), 400
     visitor_obj = Visitor.query.get(visitor_id)
-    if not visitor_obj or visitor_obj.heure_depart is not None:
+    if not visitor_obj:
+        return jsonify({'message': 'Aucun visiteur trouvé.'}), 404
+    if visitor_obj.heure_depart is not None:
         return jsonify({'message': 'Aucun enregistrement actif trouvé pour ce visiteur.'}), 404
     visitor_obj.heure_depart = datetime.utcnow()
     db.session.commit()
     return jsonify({'message': 'Heure de départ enregistrée avec succès. Merci pour votre visite et à bientôt.'})
-
-@app.route('/delete-favicon', methods=['POST'])
-def delete_favicon():
-    config = Configuration.query.first()
-    if config and config.favicon_filename:
-        favicon_path = os.path.join(app.config['FAVICON_FOLDER'], config.favicon_filename)
-        if os.path.exists(favicon_path):
-            os.remove(favicon_path)
-        config.favicon_filename = None
-        db.session.commit()
-    return redirect(url_for('configuration'))
 
 @app.route('/delete-logo', methods=['POST'])
 def delete_logo():
@@ -795,7 +750,6 @@ def change_admin_password():
             return jsonify({'success': False, 'error': msg}), 400
         flash(msg, "danger")
         return redirect(url_for('configuration', tab='tab-user'))
-    # Règles de sécurité du mot de passe
     password_errors = []
     if not new_password or len(new_password) < 8:
         password_errors.append('Au moins 8 caractères')
@@ -844,7 +798,6 @@ def save_site_name():
 @app.route('/add-notification-email', methods=['POST'])
 def add_notification_email():
     notif_email = request.form.get('notif_email', '').strip()
-    # Validation email basique
     if not notif_email or len(notif_email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", notif_email):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': 'Email de notification invalide'}), 400
@@ -930,6 +883,10 @@ def save_auth_settings():
         return jsonify({'success': True})
     flash("Paramètres Captcha enregistrés.", "success")
     return redirect(url_for('configuration', tab='tab-user'))
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    return render_template('csrf_error.html', reason=e.description), 400
 
 if __name__ == '__main__':
     with app.app_context():

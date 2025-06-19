@@ -167,10 +167,22 @@
         .info-tooltip .tooltip-text span {
             color: #888;
         }
+        #authSettingsForm input[type="text"],
+        #authSettingsForm input[type="number"],
+        #authSettingsForm input[type="password"],
+        #authSettingsForm input[type="email"],
+        #authSettingsForm input[type="checkbox"],
+        #authSettingsForm button {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #authSettingsForm input[type="checkbox"] {
+            width: auto;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
-    <!-- Modale de confirmation suppression -->
     <div id="deleteModal" style="display:none;position:fixed;z-index:99999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.25);align-items:center;justify-content:center;">
         <div style="background:#fff;padding:2em 2.5em;border-radius:12px;box-shadow:0 2px 16px #0003;min-width:320px;max-width:90vw;text-align:center;">
             <div style="font-size:1.2em;margin-bottom:1.2em;" id="deleteModalText">Confirmer la suppression ?</div>
@@ -306,7 +318,6 @@
                     </form>
                 </div>
 
-                <!-- Formulaire SMTP -->
                 <div id="tab-smtp" class="tab-content">
                     <form action="{{ url_for('save_smtp') }}" method="POST" id="smtpForm">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -343,7 +354,6 @@
                     </form>
                 </div>
 
-                <!-- Formulaire Apparence -->
                 <div id="tab-appearance" class="tab-content">
                     <form action="{{ url_for('save_appearance') }}" method="POST" enctype="multipart/form-data" id="appearanceForm">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -432,7 +442,7 @@
 
                 <div id="tab-user" class="tab-content">
                     <h3>Gestion de l'utilisateur administrateur</h3>
-                    <form action="{{ url_for('change_admin_password') }}" method="post" style="max-width:350px;margin:auto;" id="adminPasswordForm">
+                    <form action="{{ url_for('change_admin_password') }}" method="post" id="adminPasswordForm">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <label for="new_admin_password">Nouveau mot de passe :</label>
                         <input type="password" name="new_admin_password" id="new_admin_password" required style="width:100%;margin-bottom:0.5em;">
@@ -462,25 +472,25 @@
                             </span>
                         </span>
                     </h3>
-                    <form action="{{ url_for('save_auth_settings') }}" method="post" style="max-width:400px;margin:auto;" id="authSettingsForm">
+                    <form action="{{ url_for('save_auth_settings') }}" method="post" id="authSettingsForm">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="form-group">
                             <label for="captcha_enabled">Activer le captcha après X échecs :</label>
-                            <input type="checkbox" id="captcha_enabled" name="captcha_enabled" value="1" {% if config and config.captcha_enabled %}checked{% endif %}>
+                            <input type="checkbox" id="captcha_enabled" name="captcha_enabled" value="1" {% if config and config.captcha_enabled %}checked{% endif %} style="width:100%;">
                         </div>
                         <div class="form-group">
                             <label for="captcha_threshold">Nombre d'échecs avant captcha :</label>
-                            <input type="number" id="captcha_threshold" name="captcha_threshold" min="1" max="10" value="{{ config.captcha_threshold if config and config.captcha_threshold else 3 }}">
+                            <input type="number" id="captcha_threshold" name="captcha_threshold" min="1" max="10" value="{{ config.captcha_threshold if config and config.captcha_threshold else 3 }}" style="width:100%;">
                         </div>
                         <div class="form-group">
                             <label for="recaptcha_site_key">Clé de site reCAPTCHA :</label>
-                            <input type="text" id="recaptcha_site_key" name="recaptcha_site_key" value="{{ config.recaptcha_site_key if config and config.recaptcha_site_key else '' }}">
+                            <input type="text" id="recaptcha_site_key" name="recaptcha_site_key" value="{{ config.recaptcha_site_key if config and config.recaptcha_site_key else '' }}" style="width:100%;">
                         </div>
                         <div class="form-group">
                             <label for="recaptcha_secret_key">Clé secrète reCAPTCHA :</label>
-                            <input type="text" id="recaptcha_secret_key" name="recaptcha_secret_key" value="{{ config.recaptcha_secret_key if config and config.recaptcha_secret_key else '' }}">
+                            <input type="text" id="recaptcha_secret_key" name="recaptcha_secret_key" value="{{ config.recaptcha_secret_key if config and config.recaptcha_secret_key else '' }}" style="width:100%;">
                         </div>
-                        <button type="submit">Sauvegarder les paramètres Captcha</button>
+                        <button type="submit" style="width:100%;">Sauvegarder les paramètres Captcha</button>
                         <div id="authSettingsSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
                         <div id="authSettingsErrorMsg" style="margin-top:0.5em;color:#dc3545;font-weight:bold;"></div>
                     </form>
@@ -494,6 +504,7 @@
         </div>
         <div id="session-warning" style="display:none;position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#ffc107;color:#333;padding:1em 2em;border-radius:8px;z-index:9999;font-weight:bold;"></div>
     </div>
+    <input type="hidden" id="csrf_token_global" value="{{ csrf_token() }}">
 
     <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -529,7 +540,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Gestion AJAX des formulaires Personne et Email notification
     const addPersonForm = document.getElementById('addPersonForm');
     const addNotifEmailForm = document.getElementById('addNotifEmailForm');
     const siteNameForm = document.getElementById('siteNameForm');
@@ -621,7 +631,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // Formulaire SMTP AJAX
     const smtpForm = document.getElementById('smtpForm');
     if (smtpForm) {
         smtpForm.addEventListener('submit', function(event) {
@@ -651,7 +660,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // Formulaire Apparence AJAX
     const appearanceForm = document.getElementById('appearanceForm');
     if (appearanceForm) {
         appearanceForm.addEventListener('submit', function(event) {
@@ -681,10 +689,21 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // Formulaire Authentification (Captcha) AJAX
     const authSettingsForm = document.getElementById('authSettingsForm');
     if (authSettingsForm) {
         authSettingsForm.addEventListener('submit', function(event) {
+            const captchaEnabled = document.getElementById('captcha_enabled').checked;
+            const siteKey = document.getElementById('recaptcha_site_key').value.trim();
+            const secretKey = document.getElementById('recaptcha_secret_key').value.trim();
+            let err = document.getElementById('authSettingsErrorMsg');
+            if (captchaEnabled && (!siteKey || !secretKey)) {
+                event.preventDefault();
+                if (err) {
+                    err.textContent = 'Veuillez renseigner la clé de site et la clé secrète reCAPTCHA.';
+                    setTimeout(() => { err.textContent = ''; }, 3000);
+                }
+                return;
+            }
             event.preventDefault();
             const formData = new FormData(authSettingsForm);
             fetch(authSettingsForm.action, {
@@ -697,7 +716,6 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 let msg = document.getElementById('authSettingsSuccessMsg');
-                let err = document.getElementById('authSettingsErrorMsg');
                 if (data.success) {
                     if (msg) {
                         msg.textContent = 'Paramètres Captcha sauvegardés !';
@@ -710,12 +728,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             })
             .catch(error => {
-                let err = document.getElementById('authSettingsErrorMsg');
                 if (err) err.textContent = 'Erreur technique.';
             });
         });
     }
-    // Envoi du mail de test SMTP AJAX avec affichage stylé
     const sendTestBtn = document.getElementById('sendTestSmtp');
     if (sendTestBtn) {
         sendTestBtn.addEventListener('click', function() {
@@ -757,6 +773,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
+    function getCsrfToken() {
+        return document.getElementById('csrf_token_global').value;
+    }
+
     function updatePersonList(people) {
         const personListDiv = document.querySelector('.person-list');
         if (personListDiv) {
@@ -773,6 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     li.innerHTML = `
                         <span>${person.name} (${person.email})</span>
                         <form action="${deleteUrl}" method="post" style="margin:0;display:inline;" onsubmit="return confirm('Supprimer cette personne ?');">
+                            <input type="hidden" name="csrf_token" value="${getCsrfToken()}">
                             <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">&times;</button>
                         </form>
                     `;
@@ -784,6 +805,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     }
+
     function updateNotifEmailList(emails) {
         const notifEmailListDiv = document.querySelectorAll('.person-list')[1];
         if (notifEmailListDiv) {
@@ -800,6 +822,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     li.innerHTML = `
                         <span>${notif.email}</span>
                         <form action="${deleteUrl}" method="post" style="margin:0;display:inline;" onsubmit="return confirm('Supprimer cet email ?');">
+                            <input type="hidden" name="csrf_token" value="${getCsrfToken()}">
                             <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">&times;</button>
                         </form>
                     `;
@@ -811,7 +834,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     }
-    // Confirmation suppression stylée
     let deleteModal = document.getElementById('deleteModal');
     let deleteModalText = document.getElementById('deleteModalText');
     let deleteModalCancel = document.getElementById('deleteModalCancel');

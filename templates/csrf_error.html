@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Erreur de sécurité</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f7fafd; color: #0C2E45; text-align: center; padding: 60px;}
+        .error-box { background: #fff; border: 1px solid #e3e8ee; border-radius: 8px; display: inline-block; padding: 32px 48px;}
+        h1 { color: #dc3545; }
+        p { margin-top: 18px; }
+    </style>
+</head>
+<body>
+    <div class="error-box">
+        <h1>Erreur de sécurité</h1>
+        <p>{{ reason or "Le formulaire n'est plus valide ou la session a expiré." }}</p>
+        <p>Merci de <a href="{{ url_for('login') }}">vous reconnecter</a> ou de <a href="javascript:history.back()">revenir en arrière</a>.</p>
+    </div>
+</body>
+</html>

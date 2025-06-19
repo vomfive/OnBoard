@@ -209,7 +209,6 @@
             }
         }
         function validateStep(index) {
-            // Réinitialise les erreurs
             document.querySelectorAll('.form-error').forEach(e => { e.style.display = 'none'; e.textContent = ''; });
             const currentStep = steps[index];
             let isValid = true;
@@ -355,9 +354,13 @@
                             showCustomConfirm(
                                 `Bonjour ${this.dataset.prenom}, vous êtes déjà enregistré aujourd’hui.<br>Souhaitez-vous enregistrer votre départ ?`,
                                 () => {
+                                    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
                                     fetch('/sign-out-visitor', {
                                         method: 'POST',
-                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                        headers: {
+                                            'Content-Type': 'application/x-www-form-urlencoded',
+                                            'X-CSRFToken': csrfToken
+                                        },
                                         body: new URLSearchParams({ visitor_id: this.dataset.visitorId })
                                     })
                                     .then(response => response.json())
@@ -440,7 +443,6 @@
                  return;
             }
             const formData = new FormData(this);
-            // Ajout du token CSRF dans le header
             const csrfToken = document.querySelector('input[name="csrf_token"]').value;
             fetch('/enregistrer-visiteur', {
                 method: 'POST',
@@ -516,12 +518,10 @@
                 updateSubmitButtonState();
             });
         }
-        // Permettre la navigation avec Entrée
         document.querySelectorAll('#visitorForm input, #visitorForm select').forEach(input => {
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    // Si on est sur la dernière étape, submit
                     if (currentStepIndex === steps.length - 1) {
                         submitButton.click();
                     } else if (nextButton.style.display !== 'none') {
