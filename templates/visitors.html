@@ -12,74 +12,44 @@
     </title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     {% if config %}
     <style>
-        :root {
-            --primary-color: {{ config.primary_color }};
-            --primary-dark: {{ config.primary_dark }};
-            --secondary-color: {{ config.secondary_color }};
-            --secondary-dark: {{ config.secondary_dark }};
-            --success-color: {{ config.success_color }};
-            --success-dark: {{ config.success_dark }};
-            --danger-color: {{ config.danger_color }};
-            --danger-dark: {{ config.danger_dark }};
-            --background-color: {{ config.background_color }};
-            --surface-color: {{ config.surface_color }};
-            --text-color: {{ config.text_color }};
-            --text-color-light: {{ config.text_color_light }};
-            --border-color: {{ config.border_color }};
-            --divider-color: {{ config.divider_color }};
-        }
+    :root {
+        --primary-color: {{ config.primary_color }};
+        --primary-dark: {{ config.primary_dark }};
+        --secondary-color: {{ config.secondary_color }};
+        --secondary-dark: {{ config.secondary_dark }};
+        --success-color: {{ config.success_color }};
+        --success-dark: {{ config.success_dark }};
+        --danger-color: {{ config.danger_color }};
+        --danger-dark: {{ config.danger_dark }};
+        --background-color: {{ config.background_color }};
+        --surface-color: {{ config.surface_color }};
+        --text-color: {{ config.text_color }};
+        --text-color-light: {{ config.text_color_light }};
+        --border-color: {{ config.border_color }};
+        --divider-color: {{ config.divider_color }};
+    }
     </style>
     {% endif %}
     <style>
+        .text-primary {
+            color: var(--primary-color) !important;
+        }
+        body {
+            background: #f6f8fb;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 2em auto;
-            padding: 2em 1em;
-            background: var(--surface-color, #fff);
-            border-radius: var(--border-radius-medium, 8px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-        .table-responsive {
-            width: 100%;
-            overflow-x: auto;
-            margin-bottom: 2em;
-        }
-        table {
-            width: 100%;
-            min-width: 800px;
-            border-collapse: collapse;
-            background: var(--surface-color, #fff);
-            border-radius: var(--border-radius-medium, 8px);
-            overflow: hidden;
-        }
-        th, td {
-            padding: 0.8em 0.6em;
-            text-align: left;
-            border-bottom: 1px solid var(--divider-color, #e9ecef);
-        }
-        th {
-            background: var(--primary-color, #007bff);
-            color: #fff;
-            font-weight: 600;
-        }
-        tr:last-child td {
-            border-bottom: none;
-        }
-        .badge {
-            display: inline-block;
-            padding: 0.3em 0.9em;
-            border-radius: 1em;
-            font-size: 0.95em;
-            font-weight: 600;
-            color: #fff;
-        }
-        .badge-present {
-            background: var(--success-color, #28a745);
-        }
-        .badge-sorti {
-            background: var(--danger-color, #dc3545);
+            padding: 2em 1.5em 1em 1.5em; /* padding-bottom réduit */
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 6px 32px 0 rgba(0,0,0,0.07);
+            overflow: hidden; /* pour arrondis propres */
         }
         .dashboard-header {
             display: flex;
@@ -89,59 +59,255 @@
             flex-wrap: wrap;
         }
         .dashboard-title {
-            font-size: 2em;
-            font-weight: 700;
-            color: var(--text-color, #343a40);
+            font-size: 2.2em;
+            font-weight: 800;
+            color: #1a2233;
+            letter-spacing: -1px;
         }
         .present-counter {
-            background: var(--success-color, #28a745);
+            background: #2ecc71;
             color: #fff;
             border-radius: 2em;
-            padding: 0.5em 1.2em;
+            padding: 0.6em 1.5em;
             font-size: 1.1em;
             font-weight: 600;
-            margin-left: 1em;
+            box-shadow: 0 2px 8px #2ecc7133;
+        }
+        .stats-dashboard {
+            display: flex;
+            gap: 2em;
+            margin-bottom: 2.5em;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            background: linear-gradient(120deg, #f6f8fb 60%, #e9f0fa 100%);
+            border-radius: 14px;
+            padding: 1.2em 2.2em;
+            box-shadow: 0 2px 12px #0001;
+            flex: 1;
+            min-width: 210px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card i {
+            position: absolute;
+            right: 18px;
+            top: 18px;
+            font-size: 2.2em;
+            opacity: 0.13;
+        }
+        .stat-title {
+            font-size: 1.1em;
+            color: #3b4a6b;
+            font-weight: 600;
+            margin-bottom: 0.3em;
+        }
+        .stat-value {
+            font-size: 2.1em;
+            font-weight: 800;
+            color: #1a2233;
+        }
+        .stat-card.present .stat-title { color: #2ecc71; }
+        .stat-card.present .stat-value { color: #2ecc71; }
+        .stat-card.sorti .stat-title { color: #e74c3c; }
+        .stat-card.sorti .stat-value { color: #e74c3c; }
+        .stat-card.pic .stat-title,
+        .stat-card.pic .stat-value {
+            color: var(--primary-color);
+        }
+        .stat-card.pic {
+            min-height: 110px;
+        }
+        .stat-card.pic canvas {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            opacity: 0.18;
+            z-index: 1;
+            pointer-events: none;
         }
         .filter-form {
+            background: #f6f8fb;
+            border-radius: 10px;
+            padding: 1.2em 1em;
+            margin-bottom: 2em;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5em;
             flex-wrap: wrap;
-            gap: 1em;
+            gap: 1.2em;
+            align-items: flex-end;
+            box-shadow: 0 1px 4px #0001;
         }
-        .filter-group form {
+        .filter-label {
             display: flex;
-            gap: 0.5em;
-            align-items: center;
-            margin: 0;
+            flex-direction: column;
+            gap: 0.3em;
+            font-weight: 500;
+            color: #3b4a6b;
+            font-size: 1em;
+            min-width: 180px;
         }
-        .export-button {
+        .label-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 0.5em;
+            margin-bottom: 0.1em;
+        }
+        .label-row i {
+            font-size: 1.1em;
+            color: #3b4a6b;
+        }
+        .filter-form input,
+        .filter-form select {
+            margin-top: 0;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 1em;
+            align-items: center;
             margin-left: auto;
         }
-        .export-button, .filter-form button {
-            background: var(--primary-color, #007bff);
+        .filter-form button, .export-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5em;
+            background: var(--primary-color);
             color: #fff;
             border: none;
-            border-radius: var(--border-radius-small, 4px);
-            padding: 0.5em 1em;
-            font-weight: 600;
-            text-decoration: none;
-            margin-left: 1em;
-            transition: background 0.2s;
+            border-radius: 6px;
+            padding: 0.6em 1.3em;
+            font-weight: 700;
+            font-size: 1em;
+            margin: 0;
             cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: 0 1px 4px #0001;
+            text-decoration: none;
+            height: 42px;
         }
-        .export-button:hover, .filter-form button:hover {
-            background: var(--primary-dark, #0056b3);
+        .filter-form button:hover, .export-button:hover {
+            background: #1a2233;
+            color: #fff;
+        }
+        .export-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 0em;
+        }
+        .export-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5em;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 0.6em 1.3em;
+            font-weight: 700;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: 0 1px 4px #0001;
+            text-decoration: none;
+            height: 25px;
+        }
+        .export-button:hover {
+            background: #1a2233;
+            color: #fff;
+        }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 2.5em; /* plus de marge sous le tableau */
+            border-radius: 10px;
+        }
+        table {
+            width: 100%;
+            min-width: 700px;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 8px #0001;
+        }
+        th, td {
+            padding: 1em 0.7em;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        th {
+            background: var(--primary-color);
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover td {
+            background: #f6f8fb;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.35em 1.1em;
+            border-radius: 1em;
+            font-size: 1em;
+            font-weight: 700;
+            color: #fff;
+            box-shadow: 0 1px 4px #0001;
+        }
+        .badge-present {
+            background: #2ecc71;
+        }
+        .badge-sorti {
+            background: #e74c3c;
         }
         .no-visitors {
-            color: var(--text-color-light, #6c757d);
+            color: #b0b8c9;
             text-align: center;
             margin: 2em 0;
+            font-size: 1.2em;
         }
         .back-link {
             margin-top: 2em;
             text-align: center;
+        }
+        .back-link a {
+            color: var(--primary-color);
+            font-weight: 600;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .back-link a:hover {
+            color: #1a2233;
+        }
+        .pagination {
+            text-align: center;
+            margin: 2em 0 0.5em 0;
+        }
+        .pagination a, .pagination span {
+            display: inline-block;
+            margin: 0 0.2em;
+            padding: 0.5em 1em;
+            border-radius: 6px;
+            background: #f6f8fb;
+            color: var(--primary-color);
+            font-weight: 700;
+            text-decoration: none;
+            transition: background 0.2s, color 0.2s;
+        }
+        .pagination a:hover {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        .pagination .active {
+            background: var(--primary-color);
+            color: #fff;
+            pointer-events: none;
         }
         @media (max-width: 900px) {
             .container {
@@ -151,7 +317,15 @@
                 box-shadow: none;
             }
             table {
-                min-width: 600px;
+                min-width: 500px;
+            }
+            .stats-dashboard {
+                flex-direction: column;
+                gap: 1em;
+            }
+            .filter-form {
+                flex-direction: column;
+                gap: 1em;
             }
         }
     </style>
@@ -159,26 +333,87 @@
 <body>
     <div class="container">
         <div class="dashboard-header">
-            <span class="dashboard-title">Dashboard Visiteurs</span>
-            <span class="present-counter">
-                {% set presents = visitors|selectattr('heure_depart', '==', None)|list %}
-                {{ presents|length }} présent{{ 's' if presents|length > 1 else '' }}
-            </span>
+            <span class="dashboard-title"><i class="fa-solid fa-users"></i> Dashboard Visiteurs</span>
         </div>
 
-        <div class="filter-form">
-            <div class="filter-group">
-                <form method="GET" action="{{ url_for('visitors') }}" style="display: flex; flex-direction: column; margin: 0;">
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                        <label for="filter_date" style="margin-bottom: 0.2em; font-weight: 600; color: var(--primary-color, #007bff);">Filtrer par date :</label>
-                        <div style="display: flex; gap: 0.5em; align-items: center;">
-                            <input type="date" id="filter_date" name="filter_date" value="{{ selected_date if selected_date else '' }}">
-                            <button type="submit">Filtrer</button>
-                        </div>
-                    </div>
-                </form>
+        <!-- Tableau de bord statistiques -->
+        <div class="stats-dashboard">
+            <div class="stat-card">
+                <i class="fa-solid fa-users"></i>
+                <div class="stat-title">Total visiteurs</div>
+                <div class="stat-value">{{ total_visitors }}</div>
             </div>
-            <a href="{{ url_for('export_visitors_csv', filter_date=selected_date if selected_date else '') }}" class="export-button">Exporter en CSV</a>
+            <div class="stat-card present">
+                <i class="fa-solid fa-user-check"></i>
+                <div class="stat-title">Présents</div>
+                <div class="stat-value">{{ presents_count }}</div>
+            </div>
+            <div class="stat-card sorti">
+                <i class="fa-solid fa-user-minus"></i>
+                <div class="stat-title">Sortis</div>
+                <div class="stat-value">{{ sortis_count }}</div>
+            </div>
+            <div class="stat-card pic">
+                <i class="fa-solid fa-clock"></i>
+                <div class="stat-title text-primary">Pic horaire</div>
+                <div class="stat-value text-primary">
+                    {% if heure_pic %}
+                        {{ heure_pic }} ({{ nb_pic }} visiteur{{ 's' if nb_pic > 1 else '' }})
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+                <canvas id="chart-pic-horaire"></canvas>
+            </div>
+        </div>
+
+        <form class="filter-form" method="GET" action="{{ url_for('visitors') }}">
+            <label class="filter-label">
+                <span class="label-row">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>Date :</span>
+                </span>
+                <input type="date" name="filter_date" value="{{ selected_date if selected_date else '' }}">
+            </label>
+            <label class="filter-label">
+                <span class="label-row">
+                    <i class="fa-solid fa-building"></i>
+                    <span>Entreprise :</span>
+                </span>
+                <input type="text" name="entreprise" value="{{ entreprise or '' }}" placeholder="Entreprise">
+            </label>
+            <label class="filter-label">
+                <span class="label-row">
+                    <i class="fa-solid fa-user-tie"></i>
+                    <span>Personne visitée :</span>
+                </span>
+                <select name="person_id">
+                    <option value="">Toutes</option>
+                    {% for p in personnes %}
+                        <option value="{{ p.id }}" {% if person_id and person_id|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="filter-label">
+                <span class="label-row">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Statut :</span>
+                </span>
+                <select name="statut">
+                    <option value="">Tous</option>
+                    <option value="present" {% if statut == "present" %}selected{% endif %}>Présents</option>
+                    <option value="sorti" {% if statut == "sorti" %}selected{% endif %}>Sortis</option>
+                </select>
+            </label>
+            <div class="filter-actions">
+                <button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Filtrer</button>
+            </div>
+        </form>
+
+        <div class="export-row">
+            <a href="{{ url_for('export_visitors_csv', filter_date=selected_date if selected_date else '') }}" class="export-button">
+                <i class="fa-solid fa-file-csv"></i> Exporter en CSV
+            </a>
         </div>
 
         {% if visitors %}
@@ -186,11 +421,11 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Nom</th>
+                            <th><i class="fa-solid fa-user"></i> Nom</th>
                             <th>Prénom</th>
-                            <th>Entreprise</th>
-                            <th>Date</th>
-                            <th>Statut</th>
+                            <th><i class="fa-solid fa-building"></i> Entreprise</th>
+                            <th><i class="fa-solid fa-calendar-day"></i> Date</th>
+                            <th><i class="fa-solid fa-circle-info"></i> Statut</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -202,9 +437,9 @@
                                 <td>{{ visitor.date_enregistrement.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     {% if not visitor.heure_depart %}
-                                        <span class="badge badge-present">Présent</span>
+                                        <span class="badge badge-present"><i class="fa-solid fa-circle"></i> Présent</span>
                                     {% else %}
-                                        <span class="badge badge-sorti">Sorti</span>
+                                        <span class="badge badge-sorti"><i class="fa-solid fa-circle"></i> Sorti</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -212,13 +447,90 @@
                     </tbody>
                 </table>
             </div>
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% for p in range(1, total_pages+1) %}
+                    {% if p == page %}
+                        <span class="active">{{ p }}</span>
+                    {% else %}
+                        <a href="{{ url_for('visitors', filter_date=selected_date, entreprise=entreprise, person_id=person_id, statut=statut, page=p) }}" class="text-primary">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
         {% else %}
-            <p class="no-visitors">Aucun visiteur trouvé{% if selected_date %} pour la date {{ selected_date }}{% endif %}.</p>
+            <p class="no-visitors"><i class="fa-solid fa-face-frown"></i> Aucun visiteur trouvé{% if selected_date %} pour la date {{ selected_date }}{% endif %}.</p>
         {% endif %}
 
         <div class="back-link">
-            <a href="{{ url_for('index') }}">Retour à l'accueil</a>
+            <a href="{{ url_for('index') }}" class="text-primary"><i class="fa-solid fa-arrow-left"></i> Retour à l'accueil</a>
+            <a href="{{ url_for('logout') }}" style="color: #dc3545; font-weight: bold; font-size: 1.1em; margin-left:2em;">Déconnexion</a>
         </div>
     </div>
+<script>
+    var labelsHeures = [...Array(24).keys()].map(h => (h < 10 ? '0' : '') + h + 'h');
+    var visitesParHeure = {{ visites_par_heure|tojson|safe }};
+    console.log(visitesParHeure);
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const canvas = document.getElementById('chart-pic-horaire');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const dataClean = visitesParHeure.map(v => (typeof v === 'number' && !isNaN(v)) ? v : 0);
+
+    function getColor(v) {
+        // Pour 1 visiteur = bleu, 4 ou + = jaune
+        const ratio = Math.max(0, Math.min(1, (v - 1) / 3));
+        if (ratio < 0.5) {
+            const r = Math.round(41 + (46-41)*ratio*2);
+            const g = Math.round(128 + (204-128)*ratio*2);
+            const b = Math.round(185 + (113-185)*ratio*2);
+            return `rgb(${r},${g},${b})`;
+        } else {
+            const r = Math.round(46 + (241-46)*(ratio-0.5)*2);
+            const g = Math.round(204 + (196-204)*(ratio-0.5)*2);
+            const b = Math.round(113 + (15-113)*(ratio-0.5)*2);
+            return `rgb(${r},${g},${b})`;
+        }
+    }
+
+    const data = {
+        labels: labelsHeures,
+        datasets: [{
+            data: dataClean,
+            backgroundColor: 'rgba(41,128,185,0.08)',
+            borderWidth: 4,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            segment: {
+                borderColor: ctx => {
+                    const i = ctx.p1DataIndex;
+                    const v = dataClean[i];
+                    return getColor(v);
+                }
+            }
+        }]
+    };
+
+    new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false, beginAtZero: true }
+            },
+            elements: { line: { borderJoinStyle: 'round' } },
+            responsive: false,
+            animation: false
+        }
+    });
+});
+</script>
 </body>
 </html>

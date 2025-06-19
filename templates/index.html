@@ -74,25 +74,29 @@
 
         <div id="confirmationMessage"></div>
 
-        <form id="visitorForm">
+        <form id="visitorForm" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="step active">
                 <div class="form-group">
                     <label for="nom">Nom :</label>
                     <input type="text" id="nom" name="nom" required autocomplete="off">
                     <ul id="suggestions" class="suggestions-list" style="display: none;"></ul>
                 </div>
+                <div class="form-error" id="error-nom" style="color:#dc3545;display:none;"></div>
             </div>
             <div class="step">
                 <div class="form-group">
                     <label for="prenom">Prénom :</label>
                     <input type="text" id="prenom" name="prenom" required>
                 </div>
+                <div class="form-error" id="error-prenom" style="color:#dc3545;display:none;"></div>
             </div>
             <div class="step">
                 <div class="form-group">
                     <label for="entreprise">Entreprise :</label>
                     <input type="text" id="entreprise" name="entreprise" required>
                 </div>
+                <div class="form-error" id="error-entreprise" style="color:#dc3545;display:none;"></div>
             </div>
             <div class="step">
                 <div class="form-group">
@@ -102,8 +106,20 @@
                         {% for person in people_to_visit %}
                         <option value="{{ person.id }}">{{ person.name }}</option>
                         {% endfor %}
+                        <option value="autre">Autre personne</option>
                     </select>
                 </div>
+                <div id="autrePersonneFields" style="display:none; margin-bottom:1em;">
+                    <div class="form-group">
+                        <label for="autre_nom">Nom :</label>
+                        <input type="text" id="autre_nom" name="autre_nom" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="autre_prenom">Prénom :</label>
+                        <input type="text" id="autre_prenom" name="autre_prenom" autocomplete="off">
+                    </div>
+                </div>
+                <div class="form-error" id="error-personne" style="color:#dc3545;display:none;"></div>
             </div>
             {% if pdf_filename %}
             <div class="step">
@@ -112,7 +128,7 @@
                     <iframe id="pdfViewer" class="pdf-viewer"
                         src="{{ url_for('uploaded_pdf_file', filename=pdf_filename) }}" type="application/pdf"></iframe>
                     <div class="signature-section">
-                        <p>Veuillez lire attentivement les consignes ci-dessus et signer ci-dessous.</p>
+                        <p>Veuillez lire attentivement les consignes et signer ci-dessous.</p>
                         <button type="button" id="readButton" class="read-button" disabled>J'ai lu les consignes</button>
                         <div class="form-group" style="margin-top: 15px;">
                             <label for="signatureCanvas">Signature :</label>
@@ -135,27 +151,28 @@
         </div>
     </div>
     <script>
+    window.addEventListener('DOMContentLoaded', function() {
         const nomInput = document.getElementById('nom');
         const prenomInput = document.getElementById('prenom');
         const entrepriseInput = document.getElementById('entreprise');
         const suggestionsList = document.getElementById('suggestions');
         const submitButton = document.getElementById('submitButton');
-
         const pdfViewer = document.getElementById('pdfViewer');
         const readButton = document.getElementById('readButton');
         const signatureCanvas = document.getElementById('signatureCanvas');
         const clearSignatureButton = document.getElementById('clearSignatureButton');
         const signatureDataInput = document.getElementById('signatureData');
         const pdfViewedInput = document.getElementById('pdfViewed');
-
+        const personToVisitSelect = document.getElementById('person_to_visit');
+        const autreFields = document.getElementById('autrePersonneFields');
+        const autreNom = document.getElementById('autre_nom');
+        const autrePrenom = document.getElementById('autre_prenom');
         let hasViewedPdf = false;
         let hasSigned = false;
-
         const steps = document.querySelectorAll('.step');
         const prevButton = document.querySelector('.prev-button');
         const nextButton = document.querySelector('.next-button');
         const confirmationMessageDiv = document.getElementById('confirmationMessage');
-
         let currentStepIndex = 0;
 
         function activateReadButtonIfNeeded() {
@@ -166,7 +183,6 @@
                 }, 500);
             }
         }
-
         function showStep(index) {
             steps.forEach(step => step.classList.remove('active'));
             steps[index].classList.add('active');
@@ -178,7 +194,6 @@
                 activateReadButtonIfNeeded();
             }
         }
-
         function nextStep() {
             if (validateStep(currentStepIndex)) {
                 currentStepIndex++;
@@ -187,23 +202,52 @@
                 }
             }
         }
-
         function prevStep() {
             currentStepIndex--;
             if (currentStepIndex >= 0) {
                 showStep(currentStepIndex);
             }
         }
-
         function validateStep(index) {
+            // Réinitialise les erreurs
+            document.querySelectorAll('.form-error').forEach(e => { e.style.display = 'none'; e.textContent = ''; });
             const currentStep = steps[index];
-            const inputs = currentStep.querySelectorAll('input[required], select[required]');
             let isValid = true;
-            inputs.forEach(input => {
-                if (!input.checkValidity()) {
+            if (index === 0) {
+                if (!nomInput.value.trim()) {
+                    document.getElementById('error-nom').textContent = 'Veuillez renseigner votre nom.';
+                    document.getElementById('error-nom').style.display = 'block';
                     isValid = false;
                 }
-            });
+            }
+            if (index === 1) {
+                if (!prenomInput.value.trim()) {
+                    document.getElementById('error-prenom').textContent = 'Veuillez renseigner votre prénom.';
+                    document.getElementById('error-prenom').style.display = 'block';
+                    isValid = false;
+                }
+            }
+            if (index === 2) {
+                if (!entrepriseInput.value.trim()) {
+                    document.getElementById('error-entreprise').textContent = 'Veuillez renseigner votre entreprise.';
+                    document.getElementById('error-entreprise').style.display = 'block';
+                    isValid = false;
+                }
+            }
+            if (index === 3) {
+                if (!personToVisitSelect.value) {
+                    document.getElementById('error-personne').textContent = 'Veuillez sélectionner une personne à visiter.';
+                    document.getElementById('error-personne').style.display = 'block';
+                    isValid = false;
+                }
+                if (personToVisitSelect.value === 'autre') {
+                    if (!autreNom.value.trim() || !autrePrenom.value.trim()) {
+                        document.getElementById('error-personne').textContent = 'Veuillez renseigner le nom et prénom de la personne à visiter.';
+                        document.getElementById('error-personne').style.display = 'block';
+                        isValid = false;
+                    }
+                }
+            }
             if (pdfViewer && currentStep.contains(pdfViewer)) {
                 if (!hasViewedPdf) {
                     alert("Veuillez lire les consignes en entier avant de continuer.");
@@ -216,18 +260,23 @@
             }
             return isValid;
         }
-
+        function updateSubmitButtonState() {
+            const formIsValid = document.getElementById('visitorForm').checkValidity();
+            if (!pdfViewer) {
+                submitButton.disabled = !formIsValid;
+            } else {
+                submitButton.disabled = !(formIsValid && hasViewedPdf && hasSigned);
+            }
+        }
         showStep(currentStepIndex);
         nextButton.addEventListener('click', nextStep);
         prevButton.addEventListener('click', prevStep);
-
         if (signatureCanvas) {
             const ctx = signatureCanvas.getContext('2d');
             let drawing = false;
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             ctx.strokeStyle = '#000';
-
             function getMousePos(canvas, evt) {
                 const rect = canvas.getBoundingClientRect();
                 return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
@@ -265,7 +314,6 @@
                 blank.width = canvas.width; blank.height = canvas.height;
                 return canvas.toDataURL() === blank.toDataURL();
             }
-
             signatureCanvas.addEventListener('mousedown', startDrawing);
             signatureCanvas.addEventListener('mousemove', draw);
             signatureCanvas.addEventListener('mouseup', stopDrawing);
@@ -275,22 +323,9 @@
             signatureCanvas.addEventListener('touchend', stopDrawing);
             signatureCanvas.addEventListener('touchcancel', stopDrawing);
             clearSignatureButton.addEventListener('click', clearSignature);
-
-            if (signatureCanvas) {
-                 signatureCanvas.style.pointerEvents = 'none';
-                 clearSignatureButton.disabled = true;
-            }
+            signatureCanvas.style.pointerEvents = 'none';
+            clearSignatureButton.disabled = true;
         }
-
-        function updateSubmitButtonState() {
-            const formIsValid = document.getElementById('visitorForm').checkValidity();
-            if (!pdfViewer) {
-                submitButton.disabled = !formIsValid;
-            } else {
-                submitButton.disabled = !(formIsValid && hasViewedPdf && hasSigned);
-            }
-        }
-
         nomInput.addEventListener('input', function() {
             const query = this.value.trim();
             if (query.length > 1) {
@@ -298,14 +333,12 @@
                     .then(response => response.json())
                     .then(data => displaySuggestions(data))
                     .catch(error => {
-                        console.error('Erreur lors de la recherche :', error);
                         suggestionsList.style.display = 'none';
                     });
             } else {
                 suggestionsList.style.display = 'none';
             }
         });
-
         function displaySuggestions(suggestions) {
             suggestionsList.innerHTML = '';
             if (suggestions.length > 0) {
@@ -317,7 +350,6 @@
                     li.dataset.entreprise = person.entreprise;
                     li.dataset.visitorId = person.id;
                     li.dataset.enregistrementActif = person.enregistrement_actif;
-
                     li.addEventListener('click', function() {
                         if (this.dataset.enregistrementActif === 'true') {
                             showCustomConfirm(
@@ -337,14 +369,14 @@
                                     })
                                     .catch(err => alert("Erreur lors de l'enregistrement du départ : " + err.message));
                                 },
-                                () => { /* rien si non */ }
+                                () => { }
                             );
                             return;
                         }
                         nomInput.value = this.dataset.nom;
                         prenomInput.value = this.dataset.prenom;
                         entrepriseInput.value = this.dataset.entreprise;
-                        currentStepIndex = 3; 
+                        currentStepIndex = 3;
                         showStep(currentStepIndex);
                         if (pdfViewer) {
                             hasViewedPdf = false; pdfViewedInput.value = 'false';
@@ -361,19 +393,16 @@
                 suggestionsList.style.display = 'none';
             }
         }
-
         document.addEventListener('click', function(event) {
             if (!nomInput.contains(event.target) && !suggestionsList.contains(event.target)) {
                 suggestionsList.style.display = 'none';
             }
         });
-
         document.getElementById('visitorForm').addEventListener('input', function() {
             if (currentStepIndex === steps.length - 1) {
                 updateSubmitButtonState();
             }
         });
-
         if (pdfViewer) {
             pdfViewer.addEventListener('load', function() {
                 if (readButton) {
@@ -381,7 +410,6 @@
                     readButton.textContent = "J'ai lu les consignes";
                 }
             });
-
             if (readButton) {
                 readButton.addEventListener('click', function() {
                     this.disabled = true;
@@ -395,34 +423,37 @@
                     updateSubmitButtonState();
                 });
             }
-
             if (signatureCanvas) {
                 signatureCanvas.style.pointerEvents = 'none';
                 if (clearSignatureButton) clearSignatureButton.disabled = true;
             }
         }
-
         setTimeout(() => {
             if (readButton && readButton.disabled) {
                 readButton.disabled = false;
                 readButton.textContent = "J'ai lu les consignes";
             }
         }, 4000);
-
         document.getElementById('visitorForm').addEventListener('submit', function(event) {
             event.preventDefault();
             if (!validateStep(currentStepIndex)) {
                  return;
             }
             const formData = new FormData(this);
-            fetch('/enregistrer-visiteur', { method: 'POST', body: formData })
+            // Ajout du token CSRF dans le header
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            fetch('/enregistrer-visiteur', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            })
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(err => { throw new Error(err.message || `Erreur HTTP ! statut : ${response.status}`); });
                 }
                 return response.json();
             })
-            .then(data => {
+            .then((data) => {
                 document.getElementById('visitorForm').style.display = 'none';
                 document.querySelector('.step-navigation').style.display = 'none';
                 let msg = data.message || 'Enregistrement réussi !';
@@ -435,14 +466,12 @@
                 );
             })
             .catch((error) => {
-                console.error('Erreur soumission formulaire :', error);
                 alert("Erreur lors de l'enregistrement : " + error.message);
                 document.getElementById('visitorForm').style.display = 'block';
                 document.querySelector('.step-navigation').style.display = 'block';
                 confirmationMessageDiv.style.display = 'none';
             });
         });
-
         function showCustomConfirm(message, onYes, onNo) {
             const modal = document.getElementById('customConfirmModal');
             const msg = document.getElementById('customConfirmMessage');
@@ -450,7 +479,6 @@
             const noBtn = document.getElementById('customConfirmNo');
             msg.innerHTML = message;
             modal.style.display = 'flex';
-
             function cleanup() {
                 modal.style.display = 'none';
                 yesBtn.removeEventListener('click', yesHandler);
@@ -458,26 +486,51 @@
             }
             function yesHandler() { cleanup(); onYes(); }
             function noHandler() { cleanup(); if(onNo) onNo(); }
-
             yesBtn.addEventListener('click', yesHandler);
             noBtn.addEventListener('click', noHandler);
         }
-
         function showCustomSuccess(message, onOk) {
             const modal = document.getElementById('customSuccessModal');
             const msg = document.getElementById('customSuccessMessage');
             const okBtn = document.getElementById('customSuccessOk');
             msg.innerHTML = message;
             modal.style.display = 'flex';
-
             function cleanup() {
                 modal.style.display = 'none';
                 okBtn.removeEventListener('click', okHandler);
             }
             function okHandler() { cleanup(); if(onOk) onOk(); }
-
             okBtn.addEventListener('click', okHandler);
         }
+        if (personToVisitSelect) {
+            personToVisitSelect.addEventListener('change', function() {
+                if (this.value === 'autre') {
+                    autreFields.style.display = 'block';
+                    autreNom.required = true;
+                    autrePrenom.required = true;
+                } else {
+                    autreFields.style.display = 'none';
+                    autreNom.required = false;
+                    autrePrenom.required = false;
+                }
+                updateSubmitButtonState();
+            });
+        }
+        // Permettre la navigation avec Entrée
+        document.querySelectorAll('#visitorForm input, #visitorForm select').forEach(input => {
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Si on est sur la dernière étape, submit
+                    if (currentStepIndex === steps.length - 1) {
+                        submitButton.click();
+                    } else if (nextButton.style.display !== 'none') {
+                        nextStep();
+                    }
+                }
+            });
+        });
+    });
     </script>
     <div id="customConfirmModal" class="modal" style="display:none;">
         <div class="modal-content">

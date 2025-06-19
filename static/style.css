@@ -560,3 +560,33 @@ th {
     display: block;
     margin: 0 auto 2rem auto;
 }
+.stats-dashboard {
+    display: flex;
+    gap: 2em;
+    margin-bottom: 2.5em;
+    flex-wrap: wrap;
+}
+@media (max-width: 900px) {
+    .stats-dashboard {
+        flex-direction: column;
+        gap: 1em;
+    }
+}
+.stat-card.pic {
+    min-height: 180px;
+    position: relative;
+    padding-bottom: 1.5em;
+}
+.stat-card.pic canvas {
+    position: static;
+    display: block;
+    width: 100% !important;
+    height: 90px !important;
+    margin-top: 1em;
+    opacity: 1;
+    z-index: 1;
+    pointer-events: none;
+}
+.text-primary {
+    color: var(--primary-dark) !important;
+}

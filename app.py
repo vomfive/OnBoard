@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, make_response, send_from_directory, session, flash, Response
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import CSRFProtect
 from datetime import datetime, date, timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -11,34 +12,81 @@ import os
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from urllib.parse import urlparse, urljoin
+from collections import Counter
+from math import ceil
+import re
+import requests
 
 app = Flask(__name__)
 app.secret_key = "change_this_secret_key"
-app.permanent_session_lifetime = timedelta(minutes=1)
+csrf = CSRFProtect(app)
+app.permanent_session_lifetime = timedelta(minutes=30)
 
 ADMIN_PASSWORD = "tonmotdepasse"
+
+RECAPTCHA_SITE_KEY = "VOTRE_SITE_KEY"
+RECAPTCHA_SECRET_KEY = "VOTRE_SECRET_KEY"
+RECAPTCHA_THRESHOLD = 3  # nombre d'échecs avant captcha
 
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
+@app.before_request
+def make_session_permanent():
+    if session.get('admin_logged_in'):
+        session.permanent = True
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     config = Configuration.query.first()
     next_url = request.args.get('next') or request.form.get('next') or url_for('configuration')
+    message = request.args.get('message')
+    # Utilisation dynamique de la config captcha
+    captcha_enabled = bool(getattr(config, 'captcha_enabled', False))
+    captcha_threshold = getattr(config, 'captcha_threshold', 3)
+    recaptcha_site_key = getattr(config, 'recaptcha_site_key', '')
+    recaptcha_secret_key = getattr(config, 'recaptcha_secret_key', '')
+    show_captcha = captcha_enabled and session.get('login_failures', 0) >= captcha_threshold
+
     if request.method == 'POST':
         password = request.form.get('password')
+        stay_logged = request.form.get('stay_logged') == 'on'
+        # Vérification du captcha si nécessaire
+        if show_captcha:
+            recaptcha_response = request.form.get('g-recaptcha-response')
+            if not recaptcha_response:
+                flash("Veuillez valider le captcha.", "danger")
+                return render_template('login.html', config=config, next=next_url, message=message, show_captcha=show_captcha, recaptcha_site_key=recaptcha_site_key)
+            # Vérification côté Google
+            r = requests.post(
+                'https://www.google.com/recaptcha/api/siteverify',
+                data={'secret': recaptcha_secret_key, 'response': recaptcha_response}
+            )
+            if not r.json().get('success'):
+                flash("Captcha invalide.", "danger")
+                return render_template('login.html', config=config, next=next_url, message=message, show_captcha=show_captcha, recaptcha_site_key=recaptcha_site_key)
         if config and check_password_hash(config.admin_password_hash, password):
             session['admin_logged_in'] = True
+            session['login_failures'] = 0  # reset uniquement après succès
+            if stay_logged:
+                app.permanent_session_lifetime = timedelta(days=7)
+            else:
+                app.permanent_session_lifetime = timedelta(minutes=30)
+            session.permanent = True
             return redirect(next_url)
         else:
+            session['login_failures'] = session.get('login_failures', 0) + 1
             flash("Mot de passe incorrect", "danger")
-    return render_template('login.html', config=config, next=next_url)
+    # Ne pas reset login_failures sur GET
+
+    return render_template('login.html', config=config, next=next_url, message=message, show_captcha=show_captcha, recaptcha_site_key=recaptcha_site_key)
 
 @app.route('/logout')
 def logout():
     session.pop('admin_logged_in', None)
+    flash("Vous avez été déconnecté avec succès.", "success")
     return redirect(url_for('login'))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
@@ -120,6 +168,11 @@ class Configuration(db.Model):
     text_color_light = db.Column(db.String(7), default='#257C88')
     border_color = db.Column(db.String(7), default='#ced4da')
     divider_color = db.Column(db.String(7), default='#e9ecef')
+    # Champs pour captcha
+    captcha_enabled = db.Column(db.Boolean, default=False)
+    captcha_threshold = db.Column(db.Integer, default=3)
+    recaptcha_site_key = db.Column(db.String(120), nullable=True)
+    recaptcha_secret_key = db.Column(db.String(120), nullable=True)
     def __repr__(self):
         return f"Configuration(SMTP Server: '{self.smtp_server}', PDF: '{self.pdf_filename}', Favicon: '{self.favicon_filename}')"
 
@@ -181,7 +234,7 @@ def index():
 @app.route('/configuration', methods=['GET'])
 def configuration():
     if not session.get('admin_logged_in'):
-        return redirect(url_for('login', next=request.url))
+        return redirect(url_for('login', next=request.url, message='Session expirée, veuillez vous reconnecter.'))
     config = Configuration.query.first()
     people_to_visit = PersonToVisit.query.all()
     pdf_uploaded_status = False
@@ -290,17 +343,29 @@ def save_configuration():
 @app.route('/save_smtp', methods=['POST'])
 def save_smtp():
     config = Configuration.query.first()
-    config.smtp_server = request.form.get('smtp_server')
-    config.smtp_port = request.form.get('smtp_port')
-    config.smtp_user = request.form.get('smtp_user')
-    config.smtp_password = request.form.get('smtp_password')
-    config.sender_email = request.form.get('sender_email')
+    smtp_server = request.form.get('smtp_server', '').strip()
+    smtp_port = request.form.get('smtp_port', '').strip()
+    smtp_user = request.form.get('smtp_user', '').strip()
+    smtp_password = request.form.get('smtp_password', '').strip()
+    sender_email = request.form.get('sender_email', '').strip()
+    # Validation email expéditeur
+    if not sender_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", sender_email):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Email expéditeur invalide.'}), 400
+        flash("Email expéditeur invalide.", "danger")
+        return redirect(url_for('configuration', tab='tab-smtp'))
+    config.smtp_server = smtp_server
+    config.smtp_port = smtp_port
+    config.smtp_user = smtp_user
+    config.smtp_password = smtp_password
+    config.sender_email = sender_email
     db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
     return redirect(url_for('configuration', tab='tab-smtp'))
 
 @app.route('/save_appearance', methods=['POST'])
 def save_appearance():
-    print("DEBUG: save_appearance appelée !", request.form, request.files)
     config = Configuration.query.first()
     if not config:
         config = Configuration()
@@ -323,6 +388,19 @@ def save_appearance():
         file = request.files['logo_file']
         if file and file.filename:
             filename = secure_filename(file.filename)
+            if not allowed_file(filename, ALLOWED_EXTENSIONS_LOGO):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'error': 'Type de fichier logo non autorisé.'}), 400
+                flash("Type de fichier logo non autorisé.", "danger")
+                return redirect(url_for('configuration', tab='tab-appearance'))
+            file.seek(0, os.SEEK_END)
+            size = file.tell()
+            file.seek(0)
+            if size > 2 * 1024 * 1024:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'error': 'Le logo est trop volumineux (max 2 Mo).'}), 400
+                flash("Le logo est trop volumineux (max 2 Mo).", "danger")
+                return redirect(url_for('configuration', tab='tab-appearance'))
             file.save(os.path.join(app.config['LOGO_FOLDER'], filename))
             config.logo_filename = filename
     if 'favicon_file' in request.files:
@@ -332,6 +410,8 @@ def save_appearance():
             file.save(os.path.join(app.config['FAVICON_FOLDER'], filename))
             config.favicon_filename = filename
     db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
     return redirect(url_for('configuration', tab='tab-appearance'))
 
 @app.route('/save_pdf', methods=['POST'])
@@ -344,6 +424,17 @@ def save_pdf():
         file = request.files['pdf_file']
         if file and file.filename:
             filename = secure_filename(file.filename)
+            # Vérification extension
+            if not allowed_file(filename, ALLOWED_EXTENSIONS_PDF):
+                flash("Type de fichier PDF non autorisé.", "danger")
+                return redirect(url_for('configuration', tab='tab-form'))
+            # Limite de taille (ex: 5 Mo)
+            file.seek(0, os.SEEK_END)
+            size = file.tell()
+            file.seek(0)
+            if size > 5 * 1024 * 1024:
+                flash("Le PDF est trop volumineux (max 5 Mo).", "danger")
+                return redirect(url_for('configuration', tab='tab-form'))
             file.save(os.path.join(app.config['UPLOAD_FOLDER_PDF'], filename))
             config.pdf_filename = filename
     db.session.commit()
@@ -355,17 +446,33 @@ def uploaded_pdf_file(filename):
 
 @app.route('/add-person-to-visit', methods=['POST'])
 def add_person_to_visit():
-    name = request.form.get('person_name')
-    email = request.form.get('person_email')
-    if not name or not email:
+    name = request.form.get('person_name', '').strip()
+    email = request.form.get('person_email', '').strip()
+    # Validation nom : longueur, caractères autorisés (lettres, espaces, tirets)
+    if not name or len(name) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", name):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Nom invalide (caractères non autorisés ou trop long)'}), 400
+        flash("Nom invalide (caractères non autorisés ou trop long)", "danger")
+        return redirect(url_for('configuration', tab='tab-form'))
+    # Validation email basique
+    if not email or len(email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Email invalide'}), 400
+        flash("Email invalide", "danger")
         return redirect(url_for('configuration', tab='tab-form'))
     new_person = PersonToVisit(name=name, email=email)
     db.session.add(new_person)
     try:
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            people = PersonToVisit.query.all()
+            people_list = [{'id': p.id, 'name': p.name, 'email': p.email} for p in people]
+            return jsonify({'success': True, 'people': people_list})
     except Exception as e:
         db.session.rollback()
-        print(f"Erreur ajout personne: {e}")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': "Erreur lors de l'ajout de la personne."}), 500
+        flash("Erreur lors de l'ajout de la personne.", "danger")
     return redirect(url_for('configuration', tab='tab-form'))
 
 @app.route('/delete-person-to-visit/<int:person_id>', methods=['POST'])
@@ -380,12 +487,21 @@ def delete_person_to_visit(person_id):
 def enregistrer_visiteur():
     if request.method == 'POST':
         data = request.form
-        nom = data.get('nom')
-        prenom = data.get('prenom')
-        entreprise = data.get('entreprise')
+        nom = data.get('nom', '').strip()
+        prenom = data.get('prenom', '').strip()
+        entreprise = data.get('entreprise', '').strip()
         person_to_visit_id = data.get('person_to_visit')
         signature_data = data.get('signature_data')
         pdf_viewed = data.get('pdf_viewed') == 'true'
+        autre_nom = data.get('autre_nom', '').strip()
+        autre_prenom = data.get('autre_prenom', '').strip()
+        # Validation nom/prenom/entreprise
+        if not nom or len(nom) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", nom):
+            return jsonify({"message": "Nom invalide."}), 400
+        if not prenom or len(prenom) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", prenom):
+            return jsonify({"message": "Prénom invalide."}), 400
+        if not entreprise or len(entreprise) > 100 or not re.match(r"^[A-Za-zÀ-ÿ0-9\-\s'.,]+$", entreprise):
+            return jsonify({"message": "Entreprise invalide."}), 400
         if not all([nom, prenom, entreprise, person_to_visit_id]):
             return jsonify({"message": "Tous les champs sont requis."}, 400)
         config = Configuration.query.first()
@@ -395,13 +511,25 @@ def enregistrer_visiteur():
         send_emails_flag = bool(config and config.smtp_server and config.smtp_user and config.smtp_password and config.sender_email and config.smtp_port)
         if not send_emails_flag:
             print("[LOG] Avertissement : Configuration SMTP incomplète. Emails non envoyés.")
-        person_to_visit = PersonToVisit.query.get(person_to_visit_id)
-        if not person_to_visit:
-            return jsonify({"message": "Personne à visiter invalide."}, 400)
-        nouveau_visiteur = Visitor(
-            nom=nom, prenom=prenom, entreprise=entreprise,
-            person_to_visit=person_to_visit, signature_data=signature_data
-        )
+        # Gestion du cas 'autre'
+        if person_to_visit_id == 'autre':
+            if not autre_nom or not autre_prenom:
+                return jsonify({"message": "Veuillez renseigner le nom et prénom de la personne à visiter."}, 400)
+            personne_a_visiter = f"Autre : {autre_prenom} {autre_nom}"
+            nouveau_visiteur = Visitor(
+                nom=nom, prenom=prenom, entreprise=entreprise,
+                person_to_visit=None, signature_data=signature_data
+            )
+            nouveau_visiteur.email = personne_a_visiter
+            person_to_visit = None  # Pour la suite
+        else:
+            person_to_visit = PersonToVisit.query.get(person_to_visit_id)
+            if not person_to_visit:
+                return jsonify({"message": "Personne à visiter invalide."}, 400)
+            nouveau_visiteur = Visitor(
+                nom=nom, prenom=prenom, entreprise=entreprise,
+                person_to_visit=person_to_visit, signature_data=signature_data
+            )
         db.session.add(nouveau_visiteur)
         try:
             db.session.commit()
@@ -409,7 +537,7 @@ def enregistrer_visiteur():
                 "Votre enregistrement a bien été pris en compte. Merci de patienter, quelqu'un va venir vous accueillir.<br>"
                 "N'oubliez pas de venir vous désinscrire avant votre départ !"
             )
-            if send_emails_flag:
+            if send_emails_flag and person_to_visit:
                 # Préparation du logo (logo config ou logo par défaut sans accent)
                 logo_filename = config.logo_filename if config and config.logo_filename else 'default-logo.png'
                 logo_url = url_for('static', filename=f'logos/{logo_filename}', _external=True)
@@ -472,6 +600,12 @@ def visitors():
     if not session.get('admin_logged_in'):
         return redirect(url_for('login', next=request.url))
     filter_date_str = request.args.get('filter_date')
+    entreprise = request.args.get('entreprise', '').strip()
+    person_id = request.args.get('person_id', '').strip()
+    statut = request.args.get('statut', '').strip()
+    page = int(request.args.get('page', 1))
+    per_page = 20  # Nombre de visiteurs par page
+
     if not filter_date_str:
         filter_date_obj = date.today()
         filter_date_str = filter_date_obj.strftime('%Y-%m-%d')
@@ -481,12 +615,59 @@ def visitors():
         except ValueError:
             filter_date_obj = date.today()
             filter_date_str = filter_date_obj.strftime('%Y-%m-%d')
+
     visitors_query = Visitor.query.order_by(Visitor.date_enregistrement.desc())
-    if filter_date_str:
-        visitors_query = visitors_query.filter(db.func.date(Visitor.date_enregistrement) == filter_date_obj)
-    visitors_list = visitors_query.all()
+    visitors_query = visitors_query.filter(db.func.date(Visitor.date_enregistrement) == filter_date_obj)
+
+    if entreprise:
+        visitors_query = visitors_query.filter(Visitor.entreprise.ilike(f'%{entreprise}%'))
+    if person_id:
+        visitors_query = visitors_query.filter(Visitor.person_to_visit_id == int(person_id))
+    if statut == "present":
+        visitors_query = visitors_query.filter(Visitor.heure_depart == None)
+    elif statut == "sorti":
+        visitors_query = visitors_query.filter(Visitor.heure_depart != None)
+
+    total_visitors = visitors_query.count()
+    total_pages = ceil(total_visitors / per_page)
+    visitors_list = visitors_query.offset((page-1)*per_page).limit(per_page).all()
+
     config = Configuration.query.first()
-    return render_template('visitors.html', visitors=visitors_list, selected_date=filter_date_str, config=config)
+    presents = [v for v in visitors_list if v.heure_depart is None]
+    presents_count = len([v for v in visitors_query.filter(Visitor.heure_depart == None).all()])
+    sortis_count = total_visitors - presents_count
+
+    heures = [v.date_enregistrement.strftime('%H:00') for v in visitors_list if v.date_enregistrement]
+    if heures:
+        heure_pic, nb_pic = Counter(heures).most_common(1)[0]
+    else:
+        heure_pic, nb_pic = None, 0
+
+    personnes = PersonToVisit.query.all()
+    # Après avoir filtré visitors_list
+    heures = [v.date_enregistrement.strftime('%H') for v in visitors_list if v.date_enregistrement]
+    compteur_heures = Counter(heures)
+    # Pour chaque heure de 0 à 23, on met 0 si aucune visite
+    visites_par_heure = [compteur_heures.get(f"{h:02d}", 0) for h in range(24)]
+
+    return render_template(
+        'visitors.html',
+        visitors=visitors_list,
+        total_visitors=total_visitors,
+        presents_count=presents_count,
+        sortis_count=sortis_count,
+        heure_pic=heure_pic,
+        nb_pic=nb_pic,
+        config=config,
+        selected_date=filter_date_str,
+        entreprise=entreprise,
+        person_id=person_id,
+        statut=statut,
+        page=page,
+        total_pages=total_pages,
+        visites_par_heure=visites_par_heure,
+        personnes=personnes
+    )
 
 @app.route('/export-visitors-csv')
 def export_visitors_csv():
@@ -603,34 +784,89 @@ def delete_logo():
 @app.route('/change-admin-password', methods=['POST'])
 def change_admin_password():
     if not session.get('admin_logged_in'):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Non autorisé'}), 401
         return redirect(url_for('login'))
     new_password = request.form.get('new_admin_password')
-    if not new_password:
-        flash("Le mot de passe ne peut pas être vide.", "danger")
+    confirm_password = request.form.get('confirm_admin_password')
+    if new_password != confirm_password:
+        msg = 'Les deux mots de passe ne correspondent pas.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': msg}), 400
+        flash(msg, "danger")
+        return redirect(url_for('configuration', tab='tab-user'))
+    # Règles de sécurité du mot de passe
+    password_errors = []
+    if not new_password or len(new_password) < 8:
+        password_errors.append('Au moins 8 caractères')
+    if not any(c.islower() for c in new_password or ''):
+        password_errors.append('Une minuscule')
+    if not any(c.isupper() for c in new_password or ''):
+        password_errors.append('Une majuscule')
+    if not any(c.isdigit() for c in new_password or ''):
+        password_errors.append('Un chiffre')
+    if not any(c in '!@#$%^&*()-_=+[]{};:,.?/\\|<>~' for c in new_password or ''):
+        password_errors.append('Un caractère spécial')
+    if password_errors:
+        msg = 'Le mot de passe doit contenir : ' + ', '.join(password_errors) + '.'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': msg}), 400
+        flash(msg, "danger")
         return redirect(url_for('configuration', tab='tab-user'))
     config = Configuration.query.first()
     config.admin_password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
     db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
     flash("Mot de passe administrateur modifié avec succès.", "success")
     return redirect(url_for('configuration', tab='tab-user'))
 
 @app.route('/save-site-name', methods=['POST'])
 def save_site_name():
     if not session.get('admin_logged_in'):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Non autorisé'}), 401
         return redirect(url_for('login', next=request.url))
-    site_name = request.form.get('site_name')
+    site_name = request.form.get('site_name', '').strip()
+    if not site_name or len(site_name) > 100:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Nom du site invalide.'}), 400
+        flash("Nom du site invalide.", "danger")
+        return redirect(url_for('configuration', tab='tab-form'))
     config = Configuration.query.first()
     if config:
         config.site_name = site_name
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'site_name': site_name})
     return redirect(url_for('configuration', tab='tab-form'))
 
 @app.route('/add-notification-email', methods=['POST'])
 def add_notification_email():
-    notif_email = request.form.get('notif_email')
-    if notif_email and not NotificationEmail.query.filter_by(email=notif_email).first():
-        db.session.add(NotificationEmail(email=notif_email))
+    notif_email = request.form.get('notif_email', '').strip()
+    # Validation email basique
+    if not notif_email or len(notif_email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", notif_email):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Email de notification invalide'}), 400
+        flash("Email de notification invalide", "danger")
+        return redirect(url_for('configuration', tab='tab-form'))
+    if NotificationEmail.query.filter_by(email=notif_email).first():
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Cet email est déjà enregistré.'}), 400
+        flash("Cet email est déjà enregistré.", "warning")
+        return redirect(url_for('configuration', tab='tab-form'))
+    db.session.add(NotificationEmail(email=notif_email))
+    try:
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            emails = NotificationEmail.query.all()
+            emails_list = [{'id': e.id, 'email': e.email} for e in emails]
+            return jsonify({'success': True, 'emails': emails_list})
+    except Exception as e:
+        db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': "Erreur lors de l'ajout de l'email."}), 500
+        flash("Erreur lors de l'ajout de l'email.", "danger")
     return redirect(url_for('configuration', tab='tab-form'))
 
 @app.route('/delete-notification-email/<int:notif_id>', methods=['POST'])
@@ -641,14 +877,68 @@ def delete_notification_email(notif_id):
         db.session.commit()
     return redirect(url_for('configuration', tab='tab-form'))
 
+@app.route('/delete-pdf', methods=['POST'])
+def delete_pdf():
+    config = Configuration.query.first()
+    if config and config.pdf_filename:
+        pdf_path = os.path.join(app.config['UPLOAD_FOLDER_PDF'], config.pdf_filename)
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+        config.pdf_filename = None
+        db.session.commit()
+        flash("Le PDF a été supprimé.", "success")
+    else:
+        flash("Aucun PDF à supprimer.", "warning")
+    return redirect(url_for('configuration', tab='tab-form'))
+
+@app.route('/test-smtp', methods=['POST'])
+def test_smtp():
+    if not request.is_json:
+        return jsonify({'success': False, 'error': 'Requête invalide.'}), 400
+    data = request.get_json()
+    test_email = data.get('test_email', '').strip()
+    if not test_email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", test_email):
+        return jsonify({'success': False, 'error': 'Email de test invalide.'}), 400
+    config = Configuration.query.first()
+    if not config or not all([config.smtp_server, config.smtp_port, config.smtp_user, config.smtp_password, config.sender_email]):
+        return jsonify({'success': False, 'error': 'Configuration SMTP incomplète.'}), 400
+    try:
+        subject = "Test SMTP OnBoard"
+        body = "Ceci est un mail de test envoyé depuis la configuration OnBoard."
+        if send_email(test_email, subject, body, html=False):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Échec de l\'envoi du mail. Vérifiez la configuration SMTP.'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/save-auth-settings', methods=['POST'])
+def save_auth_settings():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login', next=request.url))
+    config = Configuration.query.first()
+    captcha_enabled = request.form.get('captcha_enabled') == '1'
+    captcha_threshold = request.form.get('captcha_threshold', type=int) or 3
+    recaptcha_site_key = request.form.get('recaptcha_site_key', '').strip()
+    recaptcha_secret_key = request.form.get('recaptcha_secret_key', '').strip()
+    config.captcha_enabled = captcha_enabled
+    config.captcha_threshold = captcha_threshold
+    config.recaptcha_site_key = recaptcha_site_key
+    config.recaptcha_secret_key = recaptcha_secret_key
+    db.session.commit()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
+    flash("Paramètres Captcha enregistrés.", "success")
+    return redirect(url_for('configuration', tab='tab-user'))
+
 if __name__ == '__main__':
     with app.app_context():
-        # Si la base n'existe pas ou est vide, on crée les tables
-        if not os.path.exists('users.db') or os.path.getsize('users.db') == 0:
-            db.create_all()
-            print(">>> Tables créées !")
-        # Pour la base de config
-        if not os.path.exists('config.db') or os.path.getsize('config.db') == 0:
-            db.create_all(bind='config_db')
-            print(">>> Tables config créées !")
-    app.run(debug=True, host='0.0.0.0')
+        db.create_all()
+        if not Configuration.query.first():
+            config = Configuration()
+            db.session.add(config)
+            db.session.commit()
+            print("Configuration par défaut créée (mot de passe admin = 'admin').")
+        print("Bases de données et tables créées/vérifiées.")
+    app.run(debug=True)
+

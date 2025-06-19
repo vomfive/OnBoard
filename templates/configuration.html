@@ -12,6 +12,7 @@
     </title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     {% if config %}
     <style>
         :root {
@@ -33,36 +34,6 @@
     </style>
     {% endif %}
     <style>
-        .tabs-nav {
-            display: flex;
-            margin-bottom: var(--spacing-large);
-            border-bottom: 1px solid var(--border-color);
-        }
-        .tabs-nav li {
-            list-style: none;
-            padding: var(--spacing-medium) var(--spacing-large);
-            cursor: pointer;
-            border: 1px solid transparent;
-            border-bottom: none;
-            margin-right: var(--spacing-small);
-            border-radius: var(--border-radius-medium) var(--border-radius-medium) 0 0;
-            background-color: var(--background-color);
-            color: var(--text-color-light);
-            transition: background-color 0.2s ease, color 0.2s ease;
-        }
-        .tabs-nav li.active {
-            background-color: var(--surface-color);
-            border-color: var(--border-color);
-            color: var(--primary-color);
-            font-weight: 600;
-            border-bottom: 1px solid var(--surface-color);
-            position: relative;
-            top: 1px;
-        }
-        .tabs-nav li:hover:not(.active) {
-            background-color: var(--divider-color);
-            color: var(--text-color);
-        }
         .tab-content {
             display: none;
             padding: var(--spacing-large);
@@ -82,9 +53,20 @@
         .tab-content h3, .tab-content h4 {
             text-align: left;
             margin-top: 0;
+            border-left: 5px solid var(--primary-color);
+            padding-left: 0.7em;
+            color: var(--primary-color);
+            font-weight: 700;
+            background: none;
         }
         .tab-content h4 {
             margin-top: var(--spacing-large);
+            font-size: 1.1em;
+        }
+        .tab-section-separator {
+            border: none;
+            border-top: 2px solid var(--divider-color);
+            margin: 2.5em 0 2em 0;
         }
         .favicon-preview {
             max-width: 32px;
@@ -93,294 +75,765 @@
             vertical-align: middle;
             border: 1px solid var(--border-color);
         }
+        .config-layout {
+            display: flex;
+            gap: 2em;
+        }
+        .sidebar-nav {
+            min-width: 210px;
+            background: var(--surface-color);
+            border-radius: var(--border-radius-medium);
+            box-shadow: 0 1px 8px #0001;
+            padding: 2em 0.5em 2em 0.5em;
+            height: fit-content;
+        }
+        .sidebar-nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar-nav li {
+            display: flex;
+            align-items: center;
+            gap: 0.8em;
+            padding: 1em 1.2em;
+            margin-bottom: 0.5em;
+            border-radius: var(--border-radius-medium);
+            color: var(--text-color-light);
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s;
+        }
+        .sidebar-nav li.active,
+        .sidebar-nav li:hover {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        .sidebar-nav i {
+            font-size: 1.2em;
+        }
+        .config-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .info-tooltip {
+            position: relative;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .info-tooltip .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            min-width: 180px;
+            max-width: 260px;
+            background: #fff;
+            color: var(--primary-color);
+            text-align: left;
+            border-radius: 7px;
+            border: 1px solid var(--border-color);
+            box-shadow: none;
+            padding: 0.6em 0.9em;
+            position: absolute;
+            z-index: 100;
+            left: 32px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: opacity 0.18s;
+            font-size: 13px;
+            font-family: inherit;
+            line-height: 1.5;
+            letter-spacing: 0.01em;
+            box-sizing: border-box;
+            display: block;
+            font-weight: 400;
+        }
+        .info-tooltip .tooltip-text::before {
+            display: none;
+        }
+        .info-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        .info-tooltip .tooltip-text a {
+            color: var(--primary-color);
+            text-decoration: underline;
+            font-weight: 500;
+        }
+        .info-tooltip .tooltip-text b {
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .info-tooltip .tooltip-text span {
+            color: #888;
+        }
     </style>
 </head>
 <body>
-    <div class="container" style="max-width: 800px;">
-        <h2>Configuration de l'Application</h2>
+    <!-- Modale de confirmation suppression -->
+    <div id="deleteModal" style="display:none;position:fixed;z-index:99999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.25);align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:2em 2.5em;border-radius:12px;box-shadow:0 2px 16px #0003;min-width:320px;max-width:90vw;text-align:center;">
+            <div style="font-size:1.2em;margin-bottom:1.2em;" id="deleteModalText">Confirmer la suppression ?</div>
+            <div style="display:flex;gap:1.5em;justify-content:center;">
+                <button id="deleteModalCancel" style="padding:0.5em 1.5em;border-radius:6px;border:none;background:#e9ecef;color:#333;font-weight:bold;cursor:pointer;">Annuler</button>
+                <button id="deleteModalConfirm" style="padding:0.5em 1.5em;border-radius:6px;border:none;background:#dc3545;color:#fff;font-weight:bold;cursor:pointer;">Supprimer</button>
+            </div>
+        </div>
+    </div>
 
-        <ul class="tabs-nav">
-            <li class="tab-link active" data-tab="tab-form">Formulaire & Visiteurs</li>
-            <li class="tab-link" data-tab="tab-smtp">Paramètres SMTP</li>
-            <li class="tab-link" data-tab="tab-appearance">Personnalisation</li>
-            <li class="tab-link" data-tab="tab-user">Utilisateur</li>
-        </ul>
+    <div class="container" style="max-width: 1200px;">
+        <h2>Configuration</h2>
 
-        <div id="tab-form" class="tab-content active">
-            <form action="{{ url_for('save_pdf') }}" method="POST" enctype="multipart/form-data">
-                <h3>Consignes Bâtiment (PDF)</h3>
-                <div class="form-group">
-                    <label for="pdf_file">Uploader un nouveau PDF de consignes :</label>
-                    <input type="file" id="pdf_file" name="pdf_file" accept=".pdf">
-                </div>
-                <div class="upload-status">
+        <div class="config-layout">
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="tab-link active" data-tab="tab-form">
+                        <i class="fa-solid fa-file-lines"></i> Formulaire & Visiteurs
+                    </li>
+                    <li class="tab-link" data-tab="tab-smtp">
+                        <i class="fa-solid fa-envelope"></i> Paramètres SMTP
+                    </li>
+                    <li class="tab-link" data-tab="tab-appearance">
+                        <i class="fa-solid fa-palette"></i> Personnalisation
+                    </li>
+                    <li class="tab-link" data-tab="tab-user">
+                        <i class="fa-solid fa-user-cog"></i> Authentification
+                    </li>
+                </ul>
+            </nav>
+            <div class="config-content">
+                <div id="tab-form" class="tab-content active">
+                    <h3>Consignes Bâtiment (PDF)</h3>
                     {% if pdf_uploaded %}
-                        <p>Fichier PDF actuel : <strong>{{ pdf_filename }}</strong>
-                        (<a href="{{ url_for('uploaded_pdf_file', filename=pdf_filename) }}" target="_blank">Voir</a>)
-                        </p>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin:1em 0 0 0;">
+                        <span>Fichier PDF actuel : <strong>{{ pdf_filename }}</strong> (<a href="{{ url_for('uploaded_pdf_file', filename=pdf_filename) }}" target="_blank">Voir</a>)</span>
+                        <form action="{{ url_for('delete_pdf') }}" method="post" style="margin:0;display:inline;" class="delete-form" data-confirm="Supprimer ce PDF ?">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" title="Supprimer le PDF" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em; line-height: 1;">
+                                &times;
+                            </button>
+                        </form>
+                    </div>
                     {% else %}
-                        <p>Aucun fichier PDF de consignes n'est actuellement uploadé.</p>
+                    <p>Aucun fichier PDF de consignes n'est actuellement uploadé.</p>
                     {% endif %}
-                </div>
-                <button type="submit" style="margin-top: 2rem;">Sauvegarder le PDF</button>
-            </form>
-            <hr style="margin-top:2rem; margin-bottom:2rem;">
-
-            <h3>Personnes à Visiter</h3>
-            <form action="{{ url_for('add_person_to_visit') }}" method="POST" id="addPersonForm">
-                <div class="form-group">
-                    <label for="person_name">Nom de la personne à ajouter :</label>
-                    <input type="text" id="person_name" name="person_name" required>
-                </div>
-                <div class="form-group">
-                    <label for="person_email">Email de la personne à ajouter :</label>
-                    <input type="email" id="person_email" name="person_email" required>
-                </div>
-                <button type="submit">Ajouter Personne</button>
-            </form>
-            <div class="person-list" style="margin-top: var(--spacing-large);">
-                <h5>Liste actuelle des personnes à visiter :</h5>
-                {% if people_to_visit %}
-                    <ul>
-                        {% for person in people_to_visit %}
-                            <li class="person-item" style="display: flex; align-items: center; justify-content: space-between;">
-                                <span>{{ person.name }} ({{ person.email }})</span>
-                                <form action="{{ url_for('delete_person_to_visit', person_id=person.id) }}" method="post" style="margin:0;display:inline;" onsubmit="return confirm('Supprimer cette personne ?');">
-                                    <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">
-                                        &times;
-                                    </button>
-                                </form>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Aucune personne à visiter enregistrée pour l'instant.</p>
-                {% endif %}
-            </div>
-            <hr style="margin-top:2rem; margin-bottom:2rem;">
-
-            <h3>Emails de notification (toujours prévenus)</h3>
-            <form action="{{ url_for('add_notification_email') }}" method="POST" id="addNotifEmailForm">
-                <div class="form-group">
-                    <label for="notif_email">Adresse email à ajouter :</label>
-                    <input type="email" id="notif_email" name="notif_email" required>
-                </div>
-                <button type="submit">Ajouter Email</button>
-            </form>
-            <div class="person-list" style="margin-top: var(--spacing-large);">
-                <h5>Liste actuelle des emails de notification :</h5>
-                {% if notification_emails %}
-                    <ul>
-                        {% for notif in notification_emails %}
-                            <li class="person-item" style="display: flex; align-items: center; justify-content: space-between;">
-                                <span>{{ notif.email }}</span>
-                                <form action="{{ url_for('delete_notification_email', notif_id=notif.id) }}" method="post" style="margin:0;display:inline;" onsubmit="return confirm('Supprimer cet email ?');">
-                                    <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">
-                                        &times;
-                                    </button>
-                                </form>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Aucun email de notification enregistré pour l'instant.</p>
-                {% endif %}
-            </div>
-            <hr style="margin-top:2rem; margin-bottom:2rem;">
-
-            <h3>Nom du site</h3>
-            <form action="{{ url_for('save_site_name') }}" method="POST">
-                <div class="form-group">
-                    <label for="site_name">Nom du site :</label>
-                    <input type="text" id="site_name" name="site_name" value="{{ config.site_name if config and config.site_name else '' }}" required>
-                </div>
-                <button type="submit">Sauvegarder le nom du site</button>
-            </form>
-        </div>
-
-        <!-- Formulaire SMTP -->
-        <div id="tab-smtp" class="tab-content">
-            <form action="{{ url_for('save_smtp') }}" method="POST">
-                <h3>Paramètres SMTP</h3>
-                <div class="form-group">
-                    <label for="smtp_server">Serveur SMTP :</label>
-                    <input type="text" id="smtp_server" name="smtp_server" value="{{ config.smtp_server if config else '' }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="smtp_port">Port SMTP :</label>
-                    <input type="number" id="smtp_port" name="smtp_port" value="{{ config.smtp_port if config else '' }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="smtp_user">Nom d'utilisateur SMTP :</label>
-                    <input type="text" id="smtp_user" name="smtp_user" value="{{ config.smtp_user if config else '' }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="smtp_password">Mot de passe SMTP :</label>
-                    <input type="password" id="smtp_password" name="smtp_password" value="{{ config.smtp_password if config else '' }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="sender_email">Email de l'expéditeur :</label>
-                    <input type="email" id="sender_email" name="sender_email" value="{{ config.sender_email if config else '' }}" required>
-                </div>
-                <button type="submit">Sauvegarder SMTP</button>
-            </form>
-        </div>
-
-        <!-- Formulaire Apparence -->
-        <div id="tab-appearance" class="tab-content">
-            <form action="{{ url_for('save_appearance') }}" method="POST" enctype="multipart/form-data">
-                <h3>Personnalisation de l'Apparence</h3>
-                <h4>Couleurs de l'Interface</h4>
-                <div class="color-grid">
-                    <div>
-                        <label for="primary_color">Primaire :</label>
-                        <input type="color" id="primary_color" name="primary_color" value="{{ config.primary_color if config else '#007bff' }}">
-                    </div>
-                    <div>
-                        <label for="primary_dark">Primaire foncé :</label>
-                        <input type="color" id="primary_dark" name="primary_dark" value="{{ config.primary_dark if config else '#0056b3' }}">
-                    </div>
-                    <div>
-                        <label for="secondary_color">Secondaire :</label>
-                        <input type="color" id="secondary_color" name="secondary_color" value="{{ config.secondary_color if config else '#6c757d' }}">
-                    </div>
-                    <div>
-                        <label for="secondary_dark">Secondaire foncé :</label>
-                        <input type="color" id="secondary_dark" name="secondary_dark" value="{{ config.secondary_dark if config else '#5a6268' }}">
-                    </div>
-                    <div>
-                        <label for="success_color">Succès :</label>
-                        <input type="color" id="success_color" name="success_color" value="{{ config.success_color if config else '#28a745' }}">
-                    </div>
-                    <div>
-                        <label for="success_dark">Succès foncé :</label>
-                        <input type="color" id="success_dark" name="success_dark" value="{{ config.success_dark if config else '#218838' }}">
-                    </div>
-                    <div>
-                        <label for="danger_color">Danger :</label>
-                        <input type="color" id="danger_color" name="danger_color" value="{{ config.danger_color if config else '#dc3545' }}">
-                    </div>
-                    <div>
-                        <label for="danger_dark">Danger foncé :</label>
-                        <input type="color" id="danger_dark" name="danger_dark" value="{{ config.danger_dark if config else '#c82333' }}">
-                    </div>
-                    <div>
-                        <label for="background_color">Fond :</label>
-                        <input type="color" id="background_color" name="background_color" value="{{ config.background_color if config else '#f8f9fa' }}">
-                    </div>
-                    <div>
-                        <label for="surface_color">Surface :</label>
-                        <input type="color" id="surface_color" name="surface_color" value="{{ config.surface_color if config else '#ffffff' }}">
-                    </div>
-                    <div>
-                        <label for="text_color">Texte :</label>
-                        <input type="color" id="text_color" name="text_color" value="{{ config.text_color if config else '#343a40' }}">
-                    </div>
-                    <div>
-                        <label for="text_color_light">Texte clair :</label>
-                        <input type="color" id="text_color_light" name="text_color_light" value="{{ config.text_color_light if config else '#6c757d' }}">
-                    </div>
-                    <div>
-                        <label for="border_color">Bordure :</label>
-                        <input type="color" id="border_color" name="border_color" value="{{ config.border_color if config else '#ced4da' }}">
-                    </div>
-                    <div>
-                        <label for="divider_color">Séparateur :</label>
-                        <input type="color" id="divider_color" name="divider_color" value="{{ config.divider_color if config else '#e9ecef' }}">
-                    </div>
-                </div>
-
-                <hr style="margin: var(--spacing-extra-large) 0;">
-                <h4>Logo de l'Application</h4>
-                <div class="form-group">
-                    <label for="logo_file">Uploader un logo (.png, .jpg, .jpeg, .gif, .svg):</label>
-                    <input type="file" id="logo_file" name="logo_file" accept=".png,.jpg,.jpeg,.gif,.svg">
-                    {% if config.logo_filename %}
-                        <div style="margin-top:0.5em; display: flex; align-items: center; gap: 1rem;">
-                            <img src="{{ url_for('static', filename='logos/' + config.logo_filename) }}" alt="Logo actuel" style="max-height: 60px; max-width: 200px; vertical-align: middle;">
-                            <strong>{{ config.logo_filename }}</strong>
+                    <form action="{{ url_for('save_pdf') }}" method="POST" enctype="multipart/form-data" style="margin-top:1em;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="pdf_file">Uploader un nouveau PDF de consignes :</label>
+                            <input type="file" id="pdf_file" name="pdf_file" accept=".pdf">
                         </div>
-                    {% else %}
-                        <div style="margin-top:0.5em; color:var(--text-color-light);">Aucun logo personnalisé n'est actuellement uploadé.</div>
-                    {% endif %}
+                        <button type="submit">Sauvegarder le PDF</button>
+                    </form>
+                    <hr class="tab-section-separator">
+
+                    <h3>Personnes à Visiter</h3>
+                    <form action="{{ url_for('add_person_to_visit') }}" method="POST" id="addPersonForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="person_name">Nom et prénom :</label>
+                            <input type="text" id="person_name" name="person_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="person_email">Email :</label>
+                            <input type="email" id="person_email" name="person_email" required>
+                        </div>
+                        <button type="submit">Ajouter Personne</button>
+                    </form>
+                    <div class="person-list" style="margin-top: var(--spacing-large);">
+                        <h5>Liste des personnes à visiter :</h5>
+                        {% if people_to_visit %}
+                            <ul>
+                                {% for person in people_to_visit %}
+                                    <li class="person-item" style="display: flex; align-items: center; justify-content: space-between;">
+                                        <span>{{ person.name }} ({{ person.email }})</span>
+                                        <form action="{{ url_for('delete_person_to_visit', person_id=person.id) }}" method="post" style="margin:0;display:inline;" class="delete-form" data-confirm="Supprimer cette personne ?">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">
+                                                &times;
+                                            </button>
+                                        </form>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>Aucune personne à visiter enregistrée pour l'instant.</p>
+                        {% endif %}
+                    </div>
+                    <hr class="tab-section-separator">
+
+                    <h3>Emails permanent (toujours prévenus)</h3>
+                    <form action="{{ url_for('add_notification_email') }}" method="POST" id="addNotifEmailForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="notif_email">Adresse email :</label>
+                            <input type="email" id="notif_email" name="notif_email" required>
+                        </div>
+                        <button type="submit">Ajouter Email</button>
+                        <div id="notifEmailErrorMsg" style="margin-top:0.5em;color:#dc3545;font-weight:bold;"></div>
+                    </form>
+                    <div class="person-list" style="margin-top: var(--spacing-large);">
+                        <h5>Liste des emails de permanent :</h5>
+                        {% if notification_emails %}
+                            <ul>
+                                {% for notif in notification_emails %}
+                                    <li class="person-item" style="display: flex; align-items: center; justify-content: space-between;">
+                                        <span>{{ notif.email }}</span>
+                                        <form action="{{ url_for('delete_notification_email', notif_id=notif.id) }}" method="post" style="margin:0;display:inline;" class="delete-form" data-confirm="Supprimer cet email ?">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">
+                                                &times;
+                                            </button>
+                                        </form>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>Aucun email de notification enregistré pour l'instant.</p>
+                        {% endif %}
+                    </div>
+                    <hr class="tab-section-separator">
+
+                    <h3>Nom du site</h3>
+                    <form action="{{ url_for('save_site_name') }}" method="POST" id="siteNameForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="site_name">Nom du site :</label>
+                            <input type="text" id="site_name" name="site_name" value="{{ config.site_name if config and config.site_name else '' }}" required>
+                        </div>
+                        <button type="submit">Sauvegarder le nom du site</button>
+                        <div id="siteNameSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
+                    </form>
                 </div>
-                <button type="submit">Sauvegarder l'apparence</button>
-            </form>
+
+                <!-- Formulaire SMTP -->
+                <div id="tab-smtp" class="tab-content">
+                    <form action="{{ url_for('save_smtp') }}" method="POST" id="smtpForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <h3>Paramètres SMTP</h3>
+                        <div class="form-group">
+                            <label for="smtp_server">Serveur SMTP :</label>
+                            <input type="text" id="smtp_server" name="smtp_server" value="{{ config.smtp_server if config else '' }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="smtp_port">Port SMTP :</label>
+                            <input type="number" id="smtp_port" name="smtp_port" value="{{ config.smtp_port if config else '' }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="smtp_user">Nom d'utilisateur SMTP :</label>
+                            <input type="text" id="smtp_user" name="smtp_user" value="{{ config.smtp_user if config else '' }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="smtp_password">Mot de passe SMTP :</label>
+                            <input type="password" id="smtp_password" name="smtp_password" value="{{ config.smtp_password if config else '' }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sender_email">Email de l'expéditeur :</label>
+                            <input type="email" id="sender_email" name="sender_email" value="{{ config.sender_email if config else '' }}" required>
+                        </div>
+                        <button type="submit">Sauvegarder SMTP</button>
+                        <div id="smtpSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
+                        <hr style="margin:2em 0;">
+                        <div class="form-group">
+                            <label for="test_email">Email test :</label>
+                            <input type="email" id="test_email" name="test_email" placeholder="Saisir un email pour test">
+                        </div>
+                        <button type="button" id="sendTestSmtp" style="margin-bottom:1em;">Envoyer un mail de test</button>
+                        <div id="smtpTestResult" style="margin-top:1em;color:#257C88;font-weight:bold;"></div>
+                    </form>
+                </div>
+
+                <!-- Formulaire Apparence -->
+                <div id="tab-appearance" class="tab-content">
+                    <form action="{{ url_for('save_appearance') }}" method="POST" enctype="multipart/form-data" id="appearanceForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <h3>Personnalisation de l'Apparence</h3>
+                        <h4 style="display:flex;align-items:center;justify-content:space-between;gap:1em;">
+                            Couleurs de l'Interface
+                        </h4>
+                        <div class="color-grid">
+                            <div>
+                                <label for="primary_color">Primaire :</label>
+                                <input type="color" id="primary_color" name="primary_color" value="{{ config.primary_color if config else '#007bff' }}">
+                            </div>
+                            <div>
+                                <label for="primary_dark">Primaire foncé :</label>
+                                <input type="color" id="primary_dark" name="primary_dark" value="{{ config.primary_dark if config else '#0056b3' }}">
+                            </div>
+                            <div>
+                                <label for="secondary_color">Secondaire :</label>
+                                <input type="color" id="secondary_color" name="secondary_color" value="{{ config.secondary_color if config else '#6c757d' }}">
+                            </div>
+                            <div>
+                                <label for="secondary_dark">Secondaire foncé :</label>
+                                <input type="color" id="secondary_dark" name="secondary_dark" value="{{ config.secondary_dark if config else '#5a6268' }}">
+                            </div>
+                            <div>
+                                <label for="success_color">Succès :</label>
+                                <input type="color" id="success_color" name="success_color" value="{{ config.success_color if config else '#28a745' }}">
+                            </div>
+                            <div>
+                                <label for="success_dark">Succès foncé :</label>
+                                <input type="color" id="success_dark" name="success_dark" value="{{ config.success_dark if config else '#218838' }}">
+                            </div>
+                            <div>
+                                <label for="danger_color">Danger :</label>
+                                <input type="color" id="danger_color" name="danger_color" value="{{ config.danger_color if config else '#dc3545' }}">
+                            </div>
+                            <div>
+                                <label for="danger_dark">Danger foncé :</label>
+                                <input type="color" id="danger_dark" name="danger_dark" value="{{ config.danger_dark if config else '#c82333' }}">
+                            </div>
+                            <div>
+                                <label for="background_color">Fond :</label>
+                                <input type="color" id="background_color" name="background_color" value="{{ config.background_color if config else '#f8f9fa' }}">
+                            </div>
+                            <div>
+                                <label for="surface_color">Surface :</label>
+                                <input type="color" id="surface_color" name="surface_color" value="{{ config.surface_color if config else '#ffffff' }}">
+                            </div>
+                            <div>
+                                <label for="text_color">Texte :</label>
+                                <input type="color" id="text_color" name="text_color" value="{{ config.text_color if config else '#343a40' }}">
+                            </div>
+                            <div>
+                                <label for="text_color_light">Texte clair :</label>
+                                <input type="color" id="text_color_light" name="text_color_light" value="{{ config.text_color_light if config else '#6c757d' }}">
+                            </div>
+                            <div>
+                                <label for="border_color">Bordure :</label>
+                                <input type="color" id="border_color" name="border_color" value="{{ config.border_color if config else '#ced4da' }}">
+                            </div>
+                            <div>
+                                <label for="divider_color">Séparateur :</label>
+                                <input type="color" id="divider_color" name="divider_color" value="{{ config.divider_color if config else '#e9ecef' }}">
+                            </div>
+                        </div>
+                        <hr class="tab-section-separator">
+                        <h4>Logo de l'Application</h4>
+                        {% if config.logo_filename %}
+                        <div style="margin:1em 0 0 0;">
+                            <span>
+                                <img src="{{ url_for('static', filename='logos/' + config.logo_filename) }}" alt="Logo actuel" style="max-height: 60px; max-width: 200px; vertical-align: middle;">
+                                <strong>{{ config.logo_filename }}</strong>
+                            </span>
+                        </div>
+                        {% else %}
+                        <div style="margin-top:0.5em; color:var(--text-color-light);">Aucun logo personnalisé n'est actuellement uploadé.</div>
+                        {% endif %}
+                        <div class="form-group" style="margin-top:1em;">
+                            <label for="logo_file">Uploader un logo (.png, .jpg, .jpeg, .gif, .svg):</label>
+                            <input type="file" id="logo_file" name="logo_file" accept=".png,.jpg,.jpeg,.gif,.svg">
+                        </div>
+                        <button type="submit">Sauvegarder l'apparence</button>
+                        <div id="appearanceSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
+                    </form>
+                </div>
+
+                <div id="tab-user" class="tab-content">
+                    <h3>Gestion de l'utilisateur administrateur</h3>
+                    <form action="{{ url_for('change_admin_password') }}" method="post" style="max-width:350px;margin:auto;" id="adminPasswordForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label for="new_admin_password">Nouveau mot de passe :</label>
+                        <input type="password" name="new_admin_password" id="new_admin_password" required style="width:100%;margin-bottom:0.5em;">
+                        <label for="confirm_admin_password">Confirmer le mot de passe :</label>
+                        <input type="password" name="confirm_admin_password" id="confirm_admin_password" required style="width:100%;margin-bottom:0.5em;">
+                        <ul style="font-size:0.97em;color:#888;margin:0 0 1em 0;padding-left:1.2em;">
+        <li>Au moins 8 caractères</li>
+        <li>Une majuscule, une minuscule</li>
+        <li>Un chiffre</li>
+        <li>Un caractère spécial (!@#$%^&amp;*...)</li>
+    </ul>
+                        <button type="submit">Changer le mot de passe</button>
+                        <div id="adminPasswordSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
+                        <div id="adminPasswordErrorMsg" style="margin-top:0.5em;color:#dc3545;font-weight:bold;"></div>
+                    </form>
+                    <hr class="tab-section-separator">
+                    <h3>Paramètres Captcha (sécurité connexion)
+                        <span class="info-tooltip" style="margin-left:8px;">
+                            <i class="fa-solid fa-circle-info" style="color:#257C88;cursor:pointer;"></i>
+                            <span class="tooltip-text">
+                                <b>Comment configurer le captcha ?</b><br>
+                                1. Rendez-vous sur <a href="https://www.google.com/recaptcha/admin" target="_blank" style="color:#257C88;text-decoration:underline;">https://www.google.com/recaptcha/admin</a>.<br>
+                                2. Choisissez <b>reCAPTCHA v2</b> puis <b>"Je ne suis pas un robot"</b>.<br>
+                                3. Ajoutez votre domaine (ex : <b>localhost</b> ou votre vrai domaine).<br>
+                                4. Copiez la <b>clé de site</b> et la <b>clé secrète</b> dans les champs ci-dessous.<br>
+                                <span style="color:#888;font-size:0.95em;">(La clé de site s'affiche dans le formulaire, la clé secrète reste côté serveur)</span>
+                            </span>
+                        </span>
+                    </h3>
+                    <form action="{{ url_for('save_auth_settings') }}" method="post" style="max-width:400px;margin:auto;" id="authSettingsForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="captcha_enabled">Activer le captcha après X échecs :</label>
+                            <input type="checkbox" id="captcha_enabled" name="captcha_enabled" value="1" {% if config and config.captcha_enabled %}checked{% endif %}>
+                        </div>
+                        <div class="form-group">
+                            <label for="captcha_threshold">Nombre d'échecs avant captcha :</label>
+                            <input type="number" id="captcha_threshold" name="captcha_threshold" min="1" max="10" value="{{ config.captcha_threshold if config and config.captcha_threshold else 3 }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="recaptcha_site_key">Clé de site reCAPTCHA :</label>
+                            <input type="text" id="recaptcha_site_key" name="recaptcha_site_key" value="{{ config.recaptcha_site_key if config and config.recaptcha_site_key else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="recaptcha_secret_key">Clé secrète reCAPTCHA :</label>
+                            <input type="text" id="recaptcha_secret_key" name="recaptcha_secret_key" value="{{ config.recaptcha_secret_key if config and config.recaptcha_secret_key else '' }}">
+                        </div>
+                        <button type="submit">Sauvegarder les paramètres Captcha</button>
+                        <div id="authSettingsSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
+                        <div id="authSettingsErrorMsg" style="margin-top:0.5em;color:#dc3545;font-weight:bold;"></div>
+                    </form>
+                </div>
+            </div>
         </div>
 
-        <div id="tab-user" class="tab-content">
-            <h3>Gestion de l'utilisateur administrateur</h3>
-            <form action="{{ url_for('change_admin_password') }}" method="post" style="max-width:350px;margin:auto;">
-                <label for="new_admin_password">Nouveau mot de passe :</label>
-                <input type="password" name="new_admin_password" id="new_admin_password" required style="width:100%;margin-bottom:1em;">
-                <button type="submit">Changer le mot de passe</button>
-            </form>
-        </div>
-
-        <div class="back-link" style="margin-top: var(--spacing-extra-large);">
+        <div class="back-link" style="margin-top: var(--spacing-extra-large); display: flex; justify-content: space-between; align-items: center;">
             <a href="{{ url_for('index') }}">Retour à l'accueil</a>
+            <a href="{{ url_for('logout') }}" style="color: #dc3545; font-weight: bold; font-size: 1.1em;">Déconnexion</a>
         </div>
+        <div id="session-warning" style="display:none;position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#ffc107;color:#333;padding:1em 2em;border-radius:8px;z-index:9999;font-weight:bold;"></div>
     </div>
 
     <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tabLinks = document.querySelectorAll('.tabs-nav li.tab-link');
+    const tabLinks = document.querySelectorAll('.sidebar-nav li.tab-link');
     const tabContentElements = {
         'tab-form': document.getElementById('tab-form'),
         'tab-smtp': document.getElementById('tab-smtp'),
         'tab-appearance': document.getElementById('tab-appearance'),
-        'tab-user': document.getElementById('tab-user') // AJOUT
+        'tab-user': document.getElementById('tab-user')
     };
 
     function showTab(targetTabKey) {
         Object.values(tabContentElements).forEach(contentEl => {
-            if (contentEl) contentEl.classList.remove('active');
+            if (contentEl.id === targetTabKey) {
+                contentEl.classList.add('active');
+            } else {
+                contentEl.classList.remove('active');
+            }
         });
-        tabLinks.forEach(link => link.classList.remove('active'));
-        const clickedTabLink = document.querySelector(`.tabs-nav li[data-tab='${targetTabKey}']`);
-        if (clickedTabLink) {
-            clickedTabLink.classList.add('active');
-        }
-        if (tabContentElements[targetTabKey]) {
-            tabContentElements[targetTabKey].classList.add('active');
-        }
-    }
-
-    function getUrlParameter(name) {
-        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
-        const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-        const results = regex.exec(location.search);
-        return results === null ? null : decodeURIComponent(results[1].replace(/\+/g, ' '));
-    }
-
-    const tabParam = getUrlParameter('tab');
-    if (tabParam && tabContentElements[tabParam]) {
-        showTab(tabParam);
-    } else {
-        const initialActiveTabLink = document.querySelector('.tabs-nav li.tab-link.active');
-        if (initialActiveTabLink) {
-            showTab(initialActiveTabLink.dataset.tab);
-        } else if (tabLinks.length > 0) {
-            tabLinks[0].classList.add('active');
-            showTab(tabLinks[0].dataset.tab);
-        }
+        tabLinks.forEach(link => {
+            if (link.getAttribute('data-tab') === targetTabKey) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
     }
 
     tabLinks.forEach(link => {
-        link.addEventListener('click', function (event) {
-            event.preventDefault();
-            const targetTabKey = this.dataset.tab;
-            showTab(targetTabKey);
+        link.addEventListener('click', () => {
+            const targetTab = link.getAttribute('data-tab');
+            showTab(targetTab);
         });
     });
-});
-    </script>
-    <script>
-window.addEventListener('beforeunload', function () {
-    // Appel synchrone pour garantir l'exécution avant fermeture
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", "{{ url_for('logout') }}", false); // false = synchrone
-    xhr.send();
+
+    // Gestion AJAX des formulaires Personne et Email notification
+    const addPersonForm = document.getElementById('addPersonForm');
+    const addNotifEmailForm = document.getElementById('addNotifEmailForm');
+    const siteNameForm = document.getElementById('siteNameForm');
+    const siteNameInput = document.getElementById('site_name');
+
+    if (addPersonForm) {
+        addPersonForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = new FormData(addPersonForm);
+            fetch(addPersonForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addPersonForm.reset();
+                    updatePersonList(data.people);
+                } else {
+                    alert('Erreur lors de l\'ajout de la personne : ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Une erreur est survenue. Veuillez réessayer.');
+            });
+        });
+    }
+    if (addNotifEmailForm) {
+        addNotifEmailForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = new FormData(addNotifEmailForm);
+            fetch(addNotifEmailForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let err = document.getElementById('notifEmailErrorMsg');
+                if (data.success) {
+                    addNotifEmailForm.reset();
+                    updateNotifEmailList(data.emails);
+                    if (err) err.textContent = '';
+                } else {
+                    if (err) {
+                        err.textContent = data.error || 'Erreur lors de l\'ajout de l\'email.';
+                        setTimeout(() => { err.textContent = ''; }, 3000);
+                    }
+                }
+            })
+            .catch(error => {
+                let err = document.getElementById('notifEmailErrorMsg');
+                if (err) err.textContent = 'Une erreur est survenue. Veuillez réessayer.';
+                setTimeout(() => { if(err) err.textContent = ''; }, 3000);
+            });
+        });
+    }
+    if (siteNameForm && siteNameInput) {
+        siteNameForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(siteNameForm);
+            fetch(siteNameForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    siteNameInput.value = data.site_name;
+                    let msg = document.getElementById('siteNameSuccessMsg');
+                    if (msg) {
+                        msg.textContent = 'Nom du site sauvegardé !';
+                        setTimeout(() => { msg.textContent = ''; }, 2000);
+                    }
+                } else {
+                    alert('Erreur lors de la sauvegarde du nom du site : ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(error => {
+                alert('Une erreur est survenue. Veuillez réessayer.');
+            });
+        });
+    }
+    // Formulaire SMTP AJAX
+    const smtpForm = document.getElementById('smtpForm');
+    if (smtpForm) {
+        smtpForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(smtpForm);
+            fetch(smtpForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let msg = document.getElementById('smtpSuccessMsg');
+                if (data.success) {
+                    if (msg) {
+                        msg.textContent = 'Paramètres SMTP sauvegardés !';
+                        setTimeout(() => { msg.textContent = ''; }, 2000);
+                    }
+                } else {
+                    alert('Erreur lors de la sauvegarde des paramètres SMTP : ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(error => {
+                alert('Une erreur est survenue. Veuillez réessayer.');
+            });
+        });
+    }
+    // Formulaire Apparence AJAX
+    const appearanceForm = document.getElementById('appearanceForm');
+    if (appearanceForm) {
+        appearanceForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(appearanceForm);
+            fetch(appearanceForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let msg = document.getElementById('appearanceSuccessMsg');
+                if (data.success) {
+                    if (msg) {
+                        msg.textContent = 'Apparence sauvegardée !';
+                        setTimeout(() => { msg.textContent = ''; }, 2000);
+                    }
+                } else {
+                    alert('Erreur lors de la sauvegarde de l\'apparence : ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(error => {
+                alert('Une erreur est survenue. Veuillez réessayer.');
+            });
+        });
+    }
+    // Formulaire Authentification (Captcha) AJAX
+    const authSettingsForm = document.getElementById('authSettingsForm');
+    if (authSettingsForm) {
+        authSettingsForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(authSettingsForm);
+            fetch(authSettingsForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let msg = document.getElementById('authSettingsSuccessMsg');
+                let err = document.getElementById('authSettingsErrorMsg');
+                if (data.success) {
+                    if (msg) {
+                        msg.textContent = 'Paramètres Captcha sauvegardés !';
+                        setTimeout(() => { msg.textContent = ''; }, 2000);
+                    }
+                    if (err) err.textContent = '';
+                } else {
+                    if (err) err.textContent = data.error || 'Erreur inconnue';
+                    if (msg) msg.textContent = '';
+                }
+            })
+            .catch(error => {
+                let err = document.getElementById('authSettingsErrorMsg');
+                if (err) err.textContent = 'Erreur technique.';
+            });
+        });
+    }
+    // Envoi du mail de test SMTP AJAX avec affichage stylé
+    const sendTestBtn = document.getElementById('sendTestSmtp');
+    if (sendTestBtn) {
+        sendTestBtn.addEventListener('click', function() {
+            const testEmail = document.getElementById('test_email').value.trim();
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            const resultDiv = document.getElementById('smtpTestResult');
+            resultDiv.textContent = '';
+            if (!testEmail) {
+                resultDiv.style.color = '#dc3545';
+                resultDiv.textContent = 'Veuillez saisir un email de test.';
+                setTimeout(() => { resultDiv.textContent = ''; }, 3000);
+                return;
+            }
+            sendTestBtn.disabled = true;
+            resultDiv.style.color = '#257C88';
+            resultDiv.textContent = 'Envoi en cours...';
+            fetch('/test-smtp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ test_email: testEmail })
+            })
+            .then(r => r.json())
+            .then(data => {
+                sendTestBtn.disabled = false;
+                if (data.success) {
+                    resultDiv.style.color = '#28a745';
+                    resultDiv.textContent = 'Mail de test envoyé avec succès !';
+                } else {
+                    resultDiv.style.color = '#dc3545';
+                    resultDiv.textContent = 'Erreur : ' + (data.error || 'Impossible d\'envoyer le mail.');
+                }
+                setTimeout(() => { resultDiv.textContent = ''; }, 3000);
+            })
+            .catch(() => {
+                sendTestBtn.disabled = false;
+                resultDiv.style.color = '#dc3545';
+                resultDiv.textContent = 'Erreur technique lors de l\'envoi.';
+                setTimeout(() => { resultDiv.textContent = ''; }, 3000);
+            });
+        });
+    }
+    function updatePersonList(people) {
+        const personListDiv = document.querySelector('.person-list');
+        if (personListDiv) {
+            personListDiv.innerHTML = '';
+            if (people.length > 0) {
+                const ul = document.createElement('ul');
+                people.forEach(person => {
+                    const li = document.createElement('li');
+                    li.className = 'person-item';
+                    li.style.display = 'flex';
+                    li.style.alignItems = 'center';
+                    li.style.justifyContent = 'space-between';
+                    const deleteUrl = `/delete-person-to-visit/${person.id}`;
+                    li.innerHTML = `
+                        <span>${person.name} (${person.email})</span>
+                        <form action="${deleteUrl}" method="post" style="margin:0;display:inline;" onsubmit="return confirm('Supprimer cette personne ?');">
+                            <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">&times;</button>
+                        </form>
+                    `;
+                    ul.appendChild(li);
+                });
+                personListDiv.appendChild(ul);
+            } else {
+                personListDiv.innerHTML = '<p>Aucune personne à visiter enregistrée pour l\'instant.</p>';
+            }
+        }
+    }
+    function updateNotifEmailList(emails) {
+        const notifEmailListDiv = document.querySelectorAll('.person-list')[1];
+        if (notifEmailListDiv) {
+            notifEmailListDiv.innerHTML = '';
+            if (emails.length > 0) {
+                const ul = document.createElement('ul');
+                emails.forEach(notif => {
+                    const li = document.createElement('li');
+                    li.className = 'person-item';
+                    li.style.display = 'flex';
+                    li.style.alignItems = 'center';
+                    li.style.justifyContent = 'space-between';
+                    const deleteUrl = `/delete-notification-email/${notif.id}`;
+                    li.innerHTML = `
+                        <span>${notif.email}</span>
+                        <form action="${deleteUrl}" method="post" style="margin:0;display:inline;" onsubmit="return confirm('Supprimer cet email ?');">
+                            <button type="submit" title="Supprimer" style="background: none; border: none; color: #dc3545; font-size: 1.3em; cursor: pointer; padding: 0 0.5em;">&times;</button>
+                        </form>
+                    `;
+                    ul.appendChild(li);
+                });
+                notifEmailListDiv.appendChild(ul);
+            } else {
+                notifEmailListDiv.innerHTML = '<p>Aucun email de notification enregistré pour l\'instant.</p>';
+            }
+        }
+    }
+    // Confirmation suppression stylée
+    let deleteModal = document.getElementById('deleteModal');
+    let deleteModalText = document.getElementById('deleteModalText');
+    let deleteModalCancel = document.getElementById('deleteModalCancel');
+    let deleteModalConfirm = document.getElementById('deleteModalConfirm');
+    let formToDelete = null;
+    document.querySelectorAll('form.delete-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            formToDelete = form;
+            deleteModalText.textContent = form.getAttribute('data-confirm') || 'Confirmer la suppression ?';
+            deleteModal.style.display = 'flex';
+        });
+    });
+    deleteModalCancel.onclick = function() {
+        deleteModal.style.display = 'none';
+        formToDelete = null;
+    };
+    deleteModalConfirm.onclick = function() {
+        if(formToDelete) formToDelete.submit();
+        deleteModal.style.display = 'none';
+        formToDelete = null;
+    };
 });
     </script>
 </body>

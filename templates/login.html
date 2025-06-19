@@ -29,6 +29,7 @@
             --border-color: {{ config.border_color }};
             --divider-color: {{ config.divider_color }};
         }
+        .g-recaptcha { display: inline-block; }
     </style>
     {% endif %}
 </head>
@@ -53,16 +54,23 @@
           {% endif %}
         {% endwith %}
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="password">Mot de passe :</label>
                 <input type="password" name="password" id="password" required class="input">
             </div>
             <input type="hidden" name="next" value="{{ next or '' }}">
+            {% if show_captcha %}
+                <div style="margin-bottom:1em; text-align:center;">
+                    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+                    <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+                </div>
+            {% endif %}
             <button type="submit" class="next-button">Se connecter</button>
         </form>
     </div>
     <div style="position: fixed; bottom: 12px; right: 18px; color: #888; font-size: 13px; z-index: 100;">
-        Version 1.0.1
+        Version 1.2.0
     </div>
 </body>
 </html>
