@@ -1,4 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500&family=Montserrat:wght@700&family=Poppins:wght@700&family=Roboto:wght@400&display=swap');
+
+html {
+    scroll-behavior: smooth;
+}
 :root {
     --primary-color: #0C2E45;
     --primary-dark: #257C88;
@@ -267,6 +271,8 @@ button:disabled {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-medium);
     background-color: #e9ecef;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch; /* Pour une meilleure expérience de défilement sur iOS */
 }
 .signature-section {
     margin-top: var(--spacing-large);
@@ -589,4 +595,182 @@ th {
 }
 .text-primary {
     color: var(--primary-dark) !important;
+}
+
+/* Styles pour les fenêtres modales */
+.modal {
+    position: fixed;
+    z-index: 9999;
+    left: 0; top: 0; 
+    width: 100vw; 
+    height: 100vh;
+    background: rgba(0,0,0,0.3);
+    display: none; 
+    align-items: center; 
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--surface-color, #fff);
+    padding: 2em 1.5em;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+}
+
+.modal-actions {
+    margin-top: 1.5em;
+    display: flex;
+    gap: 1em;
+    justify-content: center;
+}
+
+/* Media queries pour le responsive design */
+@media screen and (max-width: 768px) {
+    body {
+        padding: var(--spacing-medium);
+    }
+    
+    .container {
+        padding: var(--spacing-large);
+        max-width: 100%;
+        margin: 0.5rem;
+        width: calc(100% - 1rem);
+    }
+    
+    h2 {
+        font-size: 1.6rem;
+        margin-bottom: var(--spacing-large);
+    }
+    
+    .pdf-viewer {
+        height: 300px;
+    }
+    
+    .pdf-section {
+        margin-top: var(--spacing-medium);
+        padding-top: var(--spacing-medium);
+    }
+    
+    .signature-canvas {
+        height: 120px;
+    }
+    
+    .step-navigation button {
+        padding: var(--spacing-small) var(--spacing-medium);
+    }
+    
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-form input[type="date"] {
+        width: 100%;
+    }
+    
+    table {
+        display: block;
+        overflow-x: auto;
+    }
+    
+    .site-name {
+        margin-top: -1em !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    body {
+        padding: var(--spacing-small);
+    }
+    
+    .container {
+        padding: var(--spacing-medium);
+        border-radius: var(--border-radius-medium);
+        margin: 0;
+        width: 100%;
+        box-shadow: none;
+    }
+    
+    h2 {
+        font-size: 1.4rem;
+    }
+    
+    h3 {
+        font-size: 1.2rem;
+    }
+    
+    .logo-formulaire {
+        width: 140px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .pdf-viewer {
+        height: 400px;
+    }
+
+    .pdf-section {
+        margin-top: var(--spacing-medium);
+        padding-top: var(--spacing-medium);
+    }
+    
+    .pdf-section h3 {
+        font-size: 1.1rem;
+        margin-bottom: var(--spacing-small);
+    }
+    
+    .signature-canvas {
+        height: 150px; /* Augmentation de la hauteur de 100px à 150px pour mobile */
+    }
+    
+    .step-navigation {
+        gap: var(--spacing-small);
+    }
+    
+    .modal-content {
+        padding: 1.5em 1em;
+        width: 95%;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="file"],
+    input[type="date"],
+    select {
+        padding: var(--spacing-small);
+        font-size: 16px; /* Évite le zoom automatique sur iOS */
+    }
+    
+    button {
+        padding: var(--spacing-medium);
+        font-size: 0.9rem;
+    }
+    
+    .signature-buttons button {
+        padding: var(--spacing-extra-small) var(--spacing-small);
+        font-size: 0.85rem;
+    }
+    
+    .form-group {
+        margin-bottom: var(--spacing-medium);
+    }
+    
+    .suggestions-list {
+        max-height: 180px;
+    }
+    
+    .suggestions-list li {
+        padding: 0.5em;
+        font-size: 0.95rem;
+    }
+    
+    .site-name {
+        font-size: 1.1em !important;
+        margin-top: -1.2em !important;
+        margin-bottom: 0.6em !important;
+    }
 }

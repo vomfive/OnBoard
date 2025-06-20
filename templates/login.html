@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>
         {% if config and config.site_name %}
             OnBoard - {{ config.site_name }}
@@ -30,16 +31,37 @@
             --divider-color: {{ config.divider_color }};
         }
         .g-recaptcha { display: inline-block; }
+        /* Styles spécifiques à la page de connexion */
+        @media screen and (max-width: 480px) {
+            .container {
+                padding: var(--spacing-medium);
+                margin: 0;
+                width: 100%;
+                box-shadow: none;
+                border-radius: var(--border-radius-medium);
+            }
+            
+            .logo-formulaire {
+                max-width: 140px;
+                height: auto;
+            }
+            
+            h2 {
+                font-size: 1.4rem;
+                margin-bottom: 1rem;
+            }
+            
+            .g-recaptcha {
+                transform: scale(0.85);
+                transform-origin: center 0;
+                margin: 0 auto;
+            }
+        }
     </style>
     {% endif %}
 </head>
 <body>
     <div class="container">
-        {% if config and config.logo_filename %}
-            <div style="text-align:center; margin-bottom: 1.5rem;">
-                <img src="{{ url_for('static', filename='logos/' + config.logo_filename) }}" alt="Logo" style="max-height: 70px; max-width: 220px;">
-            </div>
-        {% endif %}
         <h2>Connexion</h2>
         {% if config and config.site_name %}
             <div class="site-name" style="text-align:center; font-size:1.2em; color:var(--primary-color); margin-bottom:1em;">{{ config.site_name }}</div>
@@ -57,7 +79,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="password">Mot de passe :</label>
-                <input type="password" name="password" id="password" required class="input">
+                <input type="password" name="password" id="password" required class="input" autocomplete="current-password">
             </div>
             <input type="hidden" name="next" value="{{ next or '' }}">
             {% if show_captcha %}
@@ -71,8 +93,8 @@
     </div>
     <div style="position: fixed; bottom: 12px; right: 18px; color: #888; font-size: 13px; z-index: 100;">
         <a href="https://github.com/vomfive/OnBoard" target="_blank" style="color: #888; text-decoration: underline;">
-            Version 1.2.0
+            Version 1.2.2
         </a>
-</div>
+    </div>
 </body>
 </html>

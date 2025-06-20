@@ -328,6 +328,216 @@
                 gap: 1em;
             }
         }
+        @media (max-width: 600px) {
+        .container {
+            max-width: 100vw;
+            padding: 0.5em 0.2em 0.5em 0.2em;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.7em;
+            margin-bottom: 1em;
+        }
+        .dashboard-title {
+            font-size: 1.2em;
+        }
+        .stats-dashboard {
+            flex-direction: column;
+            gap: 0.7em;
+        }
+        .stat-card {
+            min-width: 0;
+            width: 100%;
+            padding: 0.8em 1em;
+            font-size: 0.95em;
+        }
+        .stat-card i {
+            font-size: 1.5em;
+            right: 10px;
+            top: 10px;
+        }
+        .stat-title {
+            font-size: 1em;
+        }
+        .stat-value {
+            font-size: 1.3em;
+        }
+        .stat-card.pic canvas {
+            height: 50px !important;
+        }
+        .filter-form {
+            flex-direction: column;
+            gap: 0.7em;
+            padding: 0.7em 0.5em;
+        }
+        .filter-label {
+            min-width: 0;
+            width: 100%;
+            font-size: 0.95em;
+        }
+        .filter-actions {
+            width: 100%;
+            margin-left: 0;
+            justify-content: flex-end;
+        }
+        .filter-form button, .export-button {
+            width: 100%;
+            font-size: 1em;
+            padding: 0.7em 0;
+            height: auto;
+        }
+        .export-row {
+            justify-content: center;
+        }
+        .table-responsive {
+            margin-bottom: 1em;
+        }
+        table {
+            min-width: 400px;
+            font-size: 0.95em;
+        }
+        th, td {
+            padding: 0.6em 0.3em;
+        }
+        .badge {
+            font-size: 0.95em;
+            padding: 0.25em 0.7em;
+        }
+        .pagination {
+            margin: 1em 0 0.5em 0;
+        }
+        .back-link {
+            margin-top: 1em;
+            font-size: 0.95em;
+        }
+        .back-link a {
+            display: block;
+            margin-bottom: 0.5em;
+        }
+    }
+    @media (max-width: 480px) {
+        html, body {
+            max-width: 100vw;
+            overflow-x: hidden;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0.3em 0.9em !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .table-responsive {
+            width: 100% !important;
+            overflow-x: auto;
+            margin: 0 !important;
+        }
+        table {
+            min-width: 280px;
+            width: 100%;
+        }
+        /* On retire les paddings sur les autres éléments pour éviter tout débordement */
+        .stats-dashboard, .filter-form, .export-row, .dashboard-header {
+            padding-left: 0.5em !important;
+            padding-right: 0.5em !important;
+        }
+        .stat-card {
+            padding: 0.5em 0.5em !important;
+            font-size: 0.9em !important;
+            min-width: 0 !important;
+            word-break: break-word;
+        }
+        .stat-card i {
+            font-size: 1.1em !important;
+            right: 6px !important;
+            top: 6px !important;
+        }
+        .stat-title {
+            font-size: 0.95em !important;
+            word-break: break-word;
+        }
+        .stat-value {
+            font-size: 1.1em !important;
+            word-break: break-word;
+        }
+        .filter-actions {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .filter-actions button,
+        .filter-form button {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            box-sizing: border-box !important;
+        }
+    }
+    @media (max-width: 480px) {
+        .filter-form {
+            padding-left: 0.5em !important;
+            padding-right: 1.5em !important;
+        }
+        .filter-actions button,
+        .filter-form button {
+            box-sizing: border-box !important;
+        }
+        .export-row {
+            justify-content: center !important;
+            display: flex !important;
+            margin-bottom: 0.7em !important;
+        }
+        .export-button {
+            width: auto !important;
+            min-width: 180px;
+            max-width: 90vw;
+            font-size: 1em !important;
+            padding: 0.7em 1.2em !important;
+            border-radius: 10px !important;
+            display: block !important;
+            margin: 0 auto !important;
+            text-align: center !important;
+        }
+        .table-responsive {
+            margin-bottom: 0.7em !important;
+            margin-top: 0.7em !important;
+        }
+        table {
+            font-size: 0.93em !important;
+            min-width: 420px !important;
+        }
+        th, td {
+            padding: 0.5em 0.3em !important;
+            word-break: break-word;
+        }
+        th {
+            font-size: 0.98em !important;
+        }
+        .back-link {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 1em !important;
+            margin-top: 1.5em !important;
+            font-size: 1em !important;
+        }
+        .back-link a {
+            display: inline-block !important;
+            margin: 0 !important;
+            font-size: 1em !important;
+            min-width: 0;
+        }
+    }
     </style>
 </head>
 <body>

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>
         {% if config and config.site_name %}
             OnBoard - {{ config.site_name }}
@@ -36,27 +36,6 @@
             --text-color-light: {{ config.text_color_light }};
             --border-color: {{ config.border_color }};
             --divider-color: {{ config.divider_color }};
-        }
-        .modal {
-            position: fixed;
-            z-index: 9999;
-            left: 0; top: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.3);
-            display: none; align-items: center; justify-content: center;
-        }
-        .modal-content {
-            background: var(--surface-color, #fff);
-            padding: 2em 1.5em;
-            border-radius: 10px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-            text-align: center;
-            min-width: 300px;
-        }
-        .modal-actions {
-            margin-top: 1.5em;
-            display: flex;
-            gap: 1em;
-            justify-content: center;
         }
     </style>
     {% endif %}
@@ -207,8 +186,7 @@
             if (currentStepIndex >= 0) {
                 showStep(currentStepIndex);
             }
-        }
-        function validateStep(index) {
+        }            function validateStep(index) {
             document.querySelectorAll('.form-error').forEach(e => { e.style.display = 'none'; e.textContent = ''; });
             const currentStep = steps[index];
             let isValid = true;
@@ -407,34 +385,91 @@
             }
         });
         if (pdfViewer) {
+            // Variable pour suivre si l'utilisateur a atteint la fin du PDF
+            let hasReachedEnd = false;
+
+            // Fonction pour activer le bouton et défiler vers la signature
+            function activateAndScroll() {
+                // Activer le bouton de lecture s'il est désactivé
+                if (readButton && readButton.disabled) {
+                    readButton.disabled = false;
+                    readButton.textContent = "J'ai lu les consignes";
+                }
+                
+                // Activer le drapeau indiquant que l'utilisateur a lu le PDF
+                hasViewedPdf = true;
+                if (pdfViewedInput) {
+                    pdfViewedInput.value = 'true';
+                }
+                
+                // Faire défiler vers la signature après un court délai
+                setTimeout(() => {
+                    const signatureSection = document.querySelector('.signature-section');
+                    if (signatureSection) {
+                        window.scrollTo({
+                            top: signatureSection.offsetTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                }, 300);
+                
+                // Débloquer la signature
+                if (signatureCanvas) {
+                    signatureCanvas.style.pointerEvents = 'auto';
+                    if (clearSignatureButton) clearSignatureButton.disabled = false;
+                }
+            }
+            
             pdfViewer.addEventListener('load', function() {
+                // Activer le bouton après chargement
                 if (readButton) {
                     readButton.disabled = false;
                     readButton.textContent = "J'ai lu les consignes";
                 }
+                
+                // Adaptation spéciale pour les mobiles
+                if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                        if (!hasReachedEnd) {
+                            activateAndScroll();
+                            hasReachedEnd = true;
+                        }
+                    }, 5000); // 5 secondes sur mobile
+                }
             });
-            if (readButton) {
-                readButton.addEventListener('click', function() {
-                    this.disabled = true;
-                    this.textContent = "Consignes lues";
-                    hasViewedPdf = true;
-                    pdfViewedInput.value = 'true';
-                    if (signatureCanvas) {
-                        signatureCanvas.style.pointerEvents = 'auto';
-                        if (clearSignatureButton) clearSignatureButton.disabled = false;
-                    }
-                    updateSubmitButtonState();
-                });
-            }
-            if (signatureCanvas) {
-                signatureCanvas.style.pointerEvents = 'none';
-                if (clearSignatureButton) clearSignatureButton.disabled = true;
-            }
         }
+        // Fallback pour tous les dispositifs si après 4 secondes le bouton n'est toujours pas activé
+        // Cela permet de gérer les cas où le PDF ne se charge pas correctement ou les navigateurs problématiques
         setTimeout(() => {
             if (readButton && readButton.disabled) {
                 readButton.disabled = false;
                 readButton.textContent = "J'ai lu les consignes";
+                
+                // Automatiser le défilement vers la signature pour tous les appareils
+                setTimeout(() => {
+                    const signatureSection = document.querySelector('.signature-section');
+                    if (signatureSection) {
+                        window.scrollTo({
+                            top: signatureSection.offsetTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                }, 1000);
+                
+                // Sur mobile, activer aussi l'ouverture automatique du clavier pour la signature
+                if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                        if (signatureCanvas) {
+                            signatureCanvas.style.pointerEvents = 'auto';
+                            if (clearSignatureButton) clearSignatureButton.disabled = false;
+                            hasViewedPdf = true;
+                            if (pdfViewedInput) {
+                                pdfViewedInput.value = 'true';
+                            }
+                            updateSubmitButtonState();
+                        }
+                    }, 1500);
+                }
             }
         }, 4000);
         document.getElementById('visitorForm').addEventListener('submit', function(event) {
@@ -529,7 +564,56 @@
                     }
                 }
             });
-        });
+        });            // Fonction globale pour faire défiler vers la signature
+        function scrollToSignature() {
+            const signatureSection = document.querySelector('.signature-section');
+            if (signatureSection) {
+                // Calcul de la position de la section signature
+                const rect = signatureSection.getBoundingClientRect();
+                const offsetTop = rect.top + window.pageYOffset;
+                
+                // Défilement de la page vers la section signature
+                window.scrollTo({
+                    top: offsetTop - 20, // un peu d'espace au-dessus
+                    behavior: 'smooth'
+                });
+                
+                // Alternativement, utiliser scrollIntoView qui fonctionne mieux sur certains navigateurs
+                setTimeout(() => {
+                    signatureSection.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }, 100);
+            }
+        }
+            // Configuration du bouton "J'ai lu les consignes" 
+            if (readButton) {
+                console.log("Initialisation du bouton 'J'ai lu les consignes'");
+                
+                // Ajout du gestionnaire d'événement
+                readButton.addEventListener('click', function(e) {
+                    console.log("Bouton J'ai lu les consignes cliqué");
+                    this.disabled = true;
+                    this.textContent = "Consignes lues";
+                    hasViewedPdf = true;
+                    pdfViewedInput.value = 'true';
+                    if (signatureCanvas) {
+                        signatureCanvas.style.pointerEvents = 'auto';
+                        if (clearSignatureButton) clearSignatureButton.disabled = false;
+                    }
+                    updateSubmitButtonState();
+                    
+                    // Faire défiler vers la zone signature
+                    const signatureSection = document.querySelector('.signature-section');
+                    if (signatureSection) {
+                        signatureSection.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            }
     });
     </script>
     <div id="customConfirmModal" class="modal" style="display:none;">
@@ -537,7 +621,7 @@
             <p id="customConfirmMessage"></p>
             <div class="modal-actions">
                 <button id="customConfirmYes" class="submit-button">Oui</button>
-                <button id="customConfirmNo" class="submit-button" style="background:var(--danger-color,#dc3545);">Non</button>
+                <button id="customConfirmNo" class="submit-button" style="background-color:var(--danger-color);">Non</button>
             </div>
         </div>
     </div>

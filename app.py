@@ -897,5 +897,4 @@ if __name__ == '__main__':
             db.session.commit()
             print("Configuration par défaut créée (mot de passe admin = 'admin').")
         print("Bases de données et tables créées/vérifiées.")
-    app.run(debug=True)
-
+    app.run(host="0.0.0.0", port=5001, debug=True)
