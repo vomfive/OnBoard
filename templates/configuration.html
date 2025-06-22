@@ -211,6 +211,9 @@
                     <li class="tab-link" data-tab="tab-user">
                         <i class="fa-solid fa-user-cog"></i> Authentification
                     </li>
+                    <li class="tab-link" data-tab="tab-access">
+                        <i class="fa-solid fa-qrcode"></i> Accès/QRcode
+                    </li>
                 </ul>
             </nav>
             <div class="config-content">
@@ -492,8 +495,32 @@
                         </div>
                         <button type="submit" style="width:100%;">Sauvegarder les paramètres Captcha</button>
                         <div id="authSettingsSuccessMsg" style="margin-top:0.5em;color:#28a745;font-weight:bold;"></div>
-                        <div id="authSettingsErrorMsg" style="margin-top:0.5em;color:#dc3545;font-weight:bold;"></div>
+                        <div id="authSettingsErrorMsg" style="margin-top:0.5em;color:#dc3545;font-weight;"></div>
                     </form>
+                </div>
+
+                <div id="tab-access" class="tab-content">
+                    <h3>Accès rapide par QR Code</h3>
+                    <div style="display:flex;gap:2em;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start;">
+                        <div class="qrcode-card" id="card-index" style="background:#fff;border-radius:18px;box-shadow:0 2px 16px #0002;padding:2.2em 2.5em 2em 2.5em;display:flex;flex-direction:column;align-items:center;min-width:280px;max-width:340px;margin-bottom:2em;">
+                            <img src="{{ url_for('static', filename='logos/' + (config.logo_filename or 'default-logo.png')) }}" alt="Logo" style="max-width:260px;max-height:140px;margin-bottom:1.2em;">
+                            <div style="font-size:1.25em;font-weight:700;color:var(--primary-color);margin-bottom:0.5em;">Enregistrement Visiteur</div>
+                            <canvas id="qrcode-index" style="margin:1.2em 0 0.7em 0;"></canvas>
+                            <div style="margin:0.7em 0 0.7em 0;font-size:0.97em;word-break:break-all;text-align:center;">
+                                <a href="{{ url_for('index', _external=True) }}" target="_blank">{{ url_for('index', _external=True) }}</a>
+                            </div>
+                            <button onclick="printQr('card-index')" style="margin-top:0.7em;">Imprimer ce QR Code</button>
+                        </div>
+                        <div class="qrcode-card" id="card-visitors" style="background:#fff;border-radius:18px;box-shadow:0 2px 16px #0002;padding:2.2em 2.5em 2em 2.5em;display:flex;flex-direction:column;align-items:center;min-width:280px;max-width:340px;margin-bottom:2em;">
+                            <img src="{{ url_for('static', filename='logos/' + (config.logo_filename or 'default-logo.png')) }}" alt="Logo" style="max-width:260px;max-height:140px;margin-bottom:1.2em;">
+                            <div style="font-size:1.25em;font-weight:700;color:var(--primary-color);margin-bottom:0.5em;">Registre des visiteurs</div>
+                            <canvas id="qrcode-visitors" style="margin:1.2em 0 0.7em 0;"></canvas>
+                            <div style="margin:0.7em 0 0.7em 0;font-size:0.97em;word-break:break-all;text-align:center;">
+                                <a href="{{ url_for('visitors_token', token=config.visitors_token, _external=True) }}" target="_blank">{{ url_for('visitors_token', token=config.visitors_token, _external=True) }}</a>
+                            </div>
+                            <button onclick="printQr('card-visitors')" style="margin-top:0.7em;">Imprimer ce QR Code</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -506,6 +533,7 @@
     </div>
     <input type="hidden" id="csrf_token_global" value="{{ csrf_token() }}">
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
     <script>
 document.addEventListener('DOMContentLoaded', function () {
     const tabLinks = document.querySelectorAll('.sidebar-nav li.tab-link');
@@ -513,7 +541,8 @@ document.addEventListener('DOMContentLoaded', function () {
         'tab-form': document.getElementById('tab-form'),
         'tab-smtp': document.getElementById('tab-smtp'),
         'tab-appearance': document.getElementById('tab-appearance'),
-        'tab-user': document.getElementById('tab-user')
+        'tab-user': document.getElementById('tab-user'),
+        'tab-access': document.getElementById('tab-access')
     };
 
     function showTab(targetTabKey) {
@@ -856,6 +885,46 @@ document.addEventListener('DOMContentLoaded', function () {
         deleteModal.style.display = 'none';
         formToDelete = null;
     };
+
+    // QR code generation for Accès/QRcode tab
+    var qrIndex = document.getElementById('qrcode-index');
+    var qrVisitors = document.getElementById('qrcode-visitors');
+    if (qrIndex && qrVisitors) {
+        var indexUrl = "{{ url_for('index', _external=True) }}";
+        var visitorsUrl = "{{ url_for('visitors_token', token=config.visitors_token, _external=True) }}";
+        new QRious({ element: qrIndex, value: indexUrl, size: 180 });
+        new QRious({ element: qrVisitors, value: visitorsUrl, size: 180 });
+    }
+    // Impression individuelle d'une carte QR
+    window.printQr = function(cardId) {
+        var card = document.getElementById(cardId);
+        if (!card) return;
+        var printWindow = window.open('', '', 'width=400,height=600');
+        printWindow.document.write('<html><head><title>Impression QR Code</title>');
+        printWindow.document.write('<style>body{font-family:sans-serif;text-align:center;padding:2em;}a{word-break:break-all;display:block;margin:1em 0;}button{display:none;}h4{margin-bottom:0.7em;}</style>');
+        printWindow.document.write('</head><body>');
+        // Cloner le canvas pour garder le QR code
+        var clone = card.cloneNode(true);
+        var origCanvas = card.querySelector('canvas');
+        var cloneCanvas = clone.querySelector('canvas');
+        if (origCanvas && cloneCanvas) {
+            var dataUrl = origCanvas.toDataURL();
+            var ctx = cloneCanvas.getContext('2d');
+            var img = new Image();
+            img.onload = function() {
+                ctx.clearRect(0,0,cloneCanvas.width,cloneCanvas.height);
+                ctx.drawImage(img,0,0,cloneCanvas.width,cloneCanvas.height);
+                printWindow.document.body.appendChild(clone);
+                printWindow.document.close();
+                setTimeout(function(){ printWindow.print(); printWindow.close(); }, 300);
+            };
+            img.src = dataUrl;
+        } else {
+            printWindow.document.body.appendChild(clone);
+            printWindow.document.close();
+            setTimeout(function(){ printWindow.print(); printWindow.close(); }, 300);
+        }
+    }
 });
     </script>
 </body>

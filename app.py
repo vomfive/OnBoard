@@ -17,6 +17,7 @@ from collections import Counter
 from math import ceil
 import re
 import requests
+import uuid
 
 app = Flask(__name__)
 app.secret_key = "change_this_secret_key"
@@ -28,6 +29,8 @@ ADMIN_PASSWORD = "tonmotdepasse"
 RECAPTCHA_SITE_KEY = "VOTRE_SITE_KEY"
 RECAPTCHA_SECRET_KEY = "VOTRE_SECRET_KEY"
 RECAPTCHA_THRESHOLD = 3
+
+visitors_tokens = set()
 
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
@@ -82,6 +85,7 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('admin_logged_in', None)
+    session.pop('visitor_link_access', None)
     flash("Vous avez été déconnecté avec succès.", "success")
     return redirect(url_for('login'))
 
@@ -163,6 +167,7 @@ class Configuration(db.Model):
     captcha_threshold = db.Column(db.Integer, default=3)
     recaptcha_site_key = db.Column(db.String(120), nullable=True)
     recaptcha_secret_key = db.Column(db.String(120), nullable=True)
+    visitors_token = db.Column(db.String(64), nullable=True)  # Ajout du token unique
     def __repr__(self):
         return f"Configuration(SMTP Server: '{self.smtp_server}', PDF: '{self.pdf_filename}')"
 
@@ -241,6 +246,8 @@ def configuration():
 
 @app.route('/save-configuration', methods=['POST'])
 def save_configuration():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     smtp_server = request.form.get('smtp_server')
     smtp_port = request.form.get('smtp_port', type=int)
     smtp_user = request.form.get('smtp_user')
@@ -320,6 +327,8 @@ def save_configuration():
 
 @app.route('/save_smtp', methods=['POST'])
 def save_smtp():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     config = Configuration.query.first()
     smtp_server = request.form.get('smtp_server', '').strip()
     smtp_port = request.form.get('smtp_port', '').strip()
@@ -343,6 +352,8 @@ def save_smtp():
 
 @app.route('/save_appearance', methods=['POST'])
 def save_appearance():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     config = Configuration.query.first()
     if not config:
         config = Configuration()
@@ -387,6 +398,8 @@ def save_appearance():
 
 @app.route('/save_pdf', methods=['POST'])
 def save_pdf():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     config = Configuration.query.first()
     if not config:
         config = Configuration()
@@ -415,6 +428,8 @@ def uploaded_pdf_file(filename):
 
 @app.route('/add-person-to-visit', methods=['POST'])
 def add_person_to_visit():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     name = request.form.get('person_name', '').strip()
     email = request.form.get('person_email', '').strip()
     if not name or len(name) > 100 or not re.match(r"^[A-Za-zÀ-ÿ\-\s']+$", name):
@@ -444,6 +459,8 @@ def add_person_to_visit():
 
 @app.route('/delete-person-to-visit/<int:person_id>', methods=['POST'])
 def delete_person_to_visit(person_id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     person = PersonToVisit.query.get(person_id)
     if person:
         db.session.delete(person)
@@ -559,7 +576,7 @@ def enregistrer_visiteur():
 
 @app.route('/visitors', methods=['GET'])
 def visitors():
-    if not session.get('admin_logged_in'):
+    if not (session.get('admin_logged_in') or session.get('visitor_link_access')):
         return redirect(url_for('login', next=request.url))
     filter_date_str = request.args.get('filter_date')
     entreprise = request.args.get('entreprise', '').strip()
@@ -711,8 +728,7 @@ def autocomplete_visitor():
 
 @app.route('/sign-out-visitor', methods=['POST'])
 def sign_out_visitor():
-    if not session.get('admin_logged_in'):
-        return jsonify({'message': 'Session expirée ou non autorisée.'}), 401
+    # Suppression de la vérification de session pour permettre la sortie à tous
     visitor_id = request.form.get('visitor_id')
     if not visitor_id or not visitor_id.isdigit():
         return jsonify({'message': 'ID visiteur invalide.'}), 400
@@ -727,6 +743,8 @@ def sign_out_visitor():
 
 @app.route('/delete-logo', methods=['POST'])
 def delete_logo():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     config = Configuration.query.first()
     if config and config.logo_filename:
         logo_path = os.path.join(app.config['LOGO_FOLDER'], config.logo_filename)
@@ -797,6 +815,8 @@ def save_site_name():
 
 @app.route('/add-notification-email', methods=['POST'])
 def add_notification_email():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     notif_email = request.form.get('notif_email', '').strip()
     if not notif_email or len(notif_email) > 120 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", notif_email):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -824,6 +844,8 @@ def add_notification_email():
 
 @app.route('/delete-notification-email/<int:notif_id>', methods=['POST'])
 def delete_notification_email(notif_id):
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     notif = NotificationEmail.query.get(notif_id)
     if notif:
         db.session.delete(notif)
@@ -832,6 +854,8 @@ def delete_notification_email(notif_id):
 
 @app.route('/delete-pdf', methods=['POST'])
 def delete_pdf():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login'))
     config = Configuration.query.first()
     if config and config.pdf_filename:
         pdf_path = os.path.join(app.config['UPLOAD_FOLDER_PDF'], config.pdf_filename)
@@ -846,6 +870,8 @@ def delete_pdf():
 
 @app.route('/test-smtp', methods=['POST'])
 def test_smtp():
+    if not session.get('admin_logged_in'):
+        return jsonify({'success': False, 'error': 'Non autorisé'}), 401
     if not request.is_json:
         return jsonify({'success': False, 'error': 'Requête invalide.'}), 400
     data = request.get_json()
@@ -888,13 +914,40 @@ def save_auth_settings():
 def handle_csrf_error(e):
     return render_template('csrf_error.html', reason=e.description), 400
 
+# Initialisation du token visiteur unique en base
+with app.app_context():
+    db.create_all()
+    config = Configuration.query.first()
+    if not config:
+        config = Configuration()
+        db.session.add(config)
+        db.session.commit()
+        print("Configuration par défaut créée (mot de passe admin = 'admin').")
+    if not config.visitors_token:
+        config.visitors_token = str(uuid.uuid4())
+        db.session.commit()
+    print("Bases de données et tables créées/vérifiées.")
+
+@app.route('/visitors-link/<token>')
+def visitors_token(token):
+    config = Configuration.query.first()
+    if config and token == config.visitors_token:
+        session['visitor_link_access'] = True  # Flag spécifique pour accès visiteur
+        return redirect(url_for('visitors'))
+    else:
+        return "Lien invalide ou expiré.", 403
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        if not Configuration.query.first():
+        config = Configuration.query.first()
+        if not config:
             config = Configuration()
             db.session.add(config)
             db.session.commit()
             print("Configuration par défaut créée (mot de passe admin = 'admin').")
+        if not config.visitors_token:
+            config.visitors_token = str(uuid.uuid4())
+            db.session.commit()
         print("Bases de données et tables créées/vérifiées.")
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
